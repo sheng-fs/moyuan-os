@@ -1,0 +1,41 @@
+# 构建产物
+target/
+build/
+
+# IDE和编辑器文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 操作系统镜像和ISO
+*.iso
+*.img
+
+# 临时文件
+*.tmp
+*.temp
+
+# 日志文件
+*.log
+
+# 环境变量文件
+.env
+
+# 备份文件
+*.bak
+
+# Rust相关
+Cargo.lock
+
+# UEFI相关
+*.efi
+*.efi.debug
+
+# WSL相关
+.wslconfig
+
+# Windows相关
+Thumbs.db
+.DS_Store

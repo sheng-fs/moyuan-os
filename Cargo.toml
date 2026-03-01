@@ -1,0 +1,29 @@
+[workspace]
+members = [
+    "bootloader/uefi",
+    "kernel/core_microkernel",
+    "kernel/compatible_kernels/posix_compat",
+    "kernel/compatible_kernels/linux_compat",
+    "kernel/compatible_kernels/rtos_compat",
+    "services/init",
+    "services/device_service",
+    "services/fs_service",
+    "services/network_service",
+    "services/security_service",
+    "services/time_service",
+    "services/power_service",
+    "services/log_service",
+    "services/config_service",
+    "services/gui_service",
+    "services/shell_service",
+    "services/container_service"
+]
+
+[profile.dev]
+debug = true
+opt-level = 0
+
+[profile.release]
+debug = false
+opt-level = 3
+lto = true

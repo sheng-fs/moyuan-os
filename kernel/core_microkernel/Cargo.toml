@@ -1,0 +1,35 @@
+[package]
+name = "moyuan-core-microkernel"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+test = []
+
+[dependencies]
+
+[build-dependencies]
+
+[target.'cfg(target_os = "none")'.dependencies]
+
+[profile.dev]
+debug = true
+opt-level = 0
+panic = "abort"
+
+[profile.release]
+debug = false
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[[bin]]
+name = "kernel"
+path = "src/main.rs"
+
+[[bin]]
+name = "test_kernel"
+path = "src/test.rs"
+required-features = ["test"]
