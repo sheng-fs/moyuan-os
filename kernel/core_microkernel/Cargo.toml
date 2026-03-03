@@ -8,6 +8,7 @@ default = []
 test = []
 
 [dependencies]
+device_service = { path = "../../services/device_service" }
 
 [build-dependencies]
 

@@ -12,6 +12,9 @@ mod syscall;
 mod interrupt;
 mod console;
 
+// 导入设备服务
+use services::device_service;
+
 // 启动信息结构
 #[repr(C)]
 pub struct BootInfo {
@@ -89,6 +92,10 @@ fn init_kernel(boot_info: *mut BootInfo) {
     
     // 初始化系统调用
     init_syscalls();
+    
+    // 初始化设备服务
+    print!("初始化设备服务...\n");
+    device_service::init();
 }
 
 // 初始化内存管理

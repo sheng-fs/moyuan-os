@@ -80,7 +80,7 @@ pub fn register_handlers() {
 }
 
 // 注册中断处理函数
-fn register_interrupt_handler(interrupt_number: u8, handler: InterruptHandler) {
+pub fn register_interrupt_handler(interrupt_number: u8, handler: InterruptHandler) {
     unsafe {
         let handler_address = handler as u64;
         IDT[interrupt_number as usize] = IdtEntry {
