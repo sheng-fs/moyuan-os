@@ -15,7 +15,7 @@ struct PhysicalMemoryManager {
     // 已分配的页帧数量
     allocated_frames: usize,
     // 物理内存起始地址
-    physical_memory_start: u64,
+    _physical_memory_start: u64,
 }
 
 // 全局物理内存管理器
@@ -139,7 +139,7 @@ pub fn init(boot_info: *mut BootInfo) {
             bitmap,
             total_frames,
             allocated_frames: 0,
-            physical_memory_start: 0,
+            _physical_memory_start: 0,
         });
     }
 }
@@ -194,6 +194,7 @@ pub fn free_page(physical_address: usize) {
 }
 
 // 获取物理内存总量
+#[allow(dead_code)]
 pub fn get_total_memory() -> usize {
     unsafe {
         if let Some(ref manager) = PHYSICAL_MEMORY_MANAGER {
@@ -205,6 +206,7 @@ pub fn get_total_memory() -> usize {
 }
 
 // 获取已分配内存
+#[allow(dead_code)]
 pub fn get_allocated_memory() -> usize {
     unsafe {
         if let Some(ref manager) = PHYSICAL_MEMORY_MANAGER {

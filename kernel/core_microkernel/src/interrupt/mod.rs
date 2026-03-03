@@ -1,5 +1,4 @@
 use core::arch::asm;
-use crate::console;
 
 // IDT 条目类型
 #[repr(C, packed)]
@@ -41,7 +40,7 @@ pub fn init_idt() {
         // 设置IDT描述符
         let idt_descriptor = IdtDescriptor {
             limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
-            base: IDT.as_ptr() as u64,
+            base: core::ptr::addr_of!(IDT) as u64,
         };
         
         // 加载IDT
@@ -187,13 +186,14 @@ static mut TIMER_COUNT: u32 = 0;
 #[no_mangle]
 extern "C" fn timer_interrupt_handler() -> ! {
     unsafe {
+        let current_count = TIMER_COUNT;
         TIMER_COUNT += 1;
-        if TIMER_COUNT % 100 == 0 { // 每100个时钟中断（约1秒）打印一次
-            crate::console::print(core::format_args!("时钟中断: {}\n", TIMER_COUNT));
+        if current_count % 100 == 0 { // 每100个时钟中断（约1秒）打印一次
+            crate::console::print(core::format_args!("时钟中断: {}\n", current_count));
         }
         
         // 触发调度
-        if TIMER_COUNT % 10 == 0 { // 每10个时钟中断触发一次调度
+        if current_count % 10 == 0 { // 每10个时钟中断触发一次调度
             crate::task::scheduler::schedule();
         }
         

@@ -1,23 +1,36 @@
 // 系统调用号
-enum SyscallNumber {
-    Exit = 0,
-    Fork = 1,
-    Exec = 2,
-    Open = 3,
-    Read = 4,
-    Write = 5,
-    Close = 6,
-    Waitpid = 7,
-    Brk = 8,
-    Mmap = 9,
-    Munmap = 10,
-}
+// 注意：这些常量用于系统调用表索引
+#[allow(dead_code)]
+const SYS_EXIT: usize = 0;
+#[allow(dead_code)]
+const SYS_FORK: usize = 1;
+#[allow(dead_code)]
+const SYS_EXEC: usize = 2;
+#[allow(dead_code)]
+const SYS_OPEN: usize = 3;
+#[allow(dead_code)]
+const SYS_READ: usize = 4;
+#[allow(dead_code)]
+const SYS_WRITE: usize = 5;
+#[allow(dead_code)]
+const SYS_CLOSE: usize = 6;
+#[allow(dead_code)]
+const SYS_WAITPID: usize = 7;
+#[allow(dead_code)]
+const SYS_BRK: usize = 8;
+#[allow(dead_code)]
+const SYS_MMAP: usize = 9;
+#[allow(dead_code)]
+const SYS_MUNMAP: usize = 10;
+
+// 系统调用表大小
+const SYSCALL_TABLE_SIZE: usize = 11;
 
 // 系统调用处理函数类型
 type SyscallHandler = fn(usize, usize, usize, usize, usize, usize) -> isize;
 
 // 系统调用表
-static mut SYSCALL_TABLE: [Option<SyscallHandler>; 11] = [
+static mut SYSCALL_TABLE: [Option<SyscallHandler>; SYSCALL_TABLE_SIZE] = [
     Some(sys_exit),        // 0
     Some(sys_fork),        // 1
     Some(sys_exec),        // 2
@@ -34,7 +47,7 @@ static mut SYSCALL_TABLE: [Option<SyscallHandler>; 11] = [
 // 系统调用处理函数
 pub fn handle_syscall(syscall_num: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize, arg6: usize) -> isize {
     unsafe {
-        if syscall_num < SYSCALL_TABLE.len() {
+        if syscall_num < SYSCALL_TABLE_SIZE {
             if let Some(handler) = SYSCALL_TABLE[syscall_num] {
                 return handler(arg1, arg2, arg3, arg4, arg5, arg6);
             }
@@ -44,7 +57,7 @@ pub fn handle_syscall(syscall_num: usize, arg1: usize, arg2: usize, arg3: usize,
 }
 
 // 退出系统调用
-fn sys_exit(status: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
+fn sys_exit(_status: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
     // 终止当前进程
     if let Some(current_process) = crate::task::process::get_current_process() {
         let pid = current_process.pid;
@@ -74,19 +87,19 @@ fn sys_fork(_arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize
 }
 
 // 执行程序系统调用
-fn sys_exec(path: usize, argv: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
+fn sys_exec(_path: usize, _argv: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
     // 这里实现执行程序系统调用
     0
 }
 
 // 打开文件系统调用
-fn sys_open(path: usize, flags: usize, mode: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
+fn sys_open(_path: usize, _flags: usize, _mode: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
     // 这里实现打开文件系统调用
     0
 }
 
 // 读取文件系统调用
-fn sys_read(fd: usize, buf: usize, count: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
+fn sys_read(_fd: usize, _buf: usize, _count: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
     // 这里实现读取文件系统调用
     0
 }
@@ -106,13 +119,13 @@ fn sys_write(fd: usize, buf: usize, count: usize, _arg4: usize, _arg5: usize, _a
 }
 
 // 关闭文件系统调用
-fn sys_close(fd: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
+fn sys_close(_fd: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
     // 这里实现关闭文件系统调用
     0
 }
 
 // 等待进程系统调用
-fn sys_waitpid(pid: usize, status: usize, options: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
+fn sys_waitpid(_pid: usize, _status: usize, _options: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
     // 这里实现等待进程系统调用
     0
 }
@@ -125,13 +138,13 @@ fn sys_brk(addr: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, 
 }
 
 // 内存映射系统调用
-fn sys_mmap(addr: usize, length: usize, prot: usize, flags: usize, fd: usize, offset: usize) -> isize {
+fn sys_mmap(_addr: usize, _length: usize, _prot: usize, _flags: usize, _fd: usize, _offset: usize) -> isize {
     // 这里实现内存映射系统调用
     0
 }
 
 // 解除内存映射系统调用
-fn sys_munmap(addr: usize, length: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
+fn sys_munmap(_addr: usize, _length: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> isize {
     // 这里实现解除内存映射系统调用
     0
 }

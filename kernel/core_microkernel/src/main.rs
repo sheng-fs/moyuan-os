@@ -1,7 +1,9 @@
 #![no_std]
 #![no_main]
 
+#[cfg(all(not(feature = "test"), not(test)))]
 use core::panic::PanicInfo;
+
 
 // 导入各个模块
 mod mm;
@@ -131,9 +133,9 @@ fn test_multiprocess() {
     print!("测试多进程创建和调度...\n");
     
     // 创建两个子进程
-    for i in 0..2 {
+    for _i in 0..2 {
         // 这里简化处理，实际应该通过系统调用创建进程
-        if let Some(child_pid) = task::process::process_create(test_process_entry as u64, 4096) {
+        if let Some(child_pid) = task::process::process_create(test_process_entry as *const () as u64, 4096) {
             task::scheduler::add_to_ready_queue(child_pid);
             print!("创建子进程: {}\n", child_pid);
         }
@@ -162,6 +164,7 @@ fn init_syscalls() {
 }
 
 // 恐慌处理
+#[cfg(all(not(feature = "test"), not(test)))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     // 打印恐慌信息

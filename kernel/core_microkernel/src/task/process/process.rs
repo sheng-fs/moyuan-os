@@ -1,4 +1,5 @@
 // 进程控制块
+#[allow(dead_code)]
 #[derive(Copy, Clone)]
 pub struct ProcessControlBlock {
     // 进程ID
@@ -22,6 +23,7 @@ pub struct ProcessControlBlock {
 }
 
 // 进程状态
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ProcessState {
     Running,
@@ -52,11 +54,11 @@ pub fn init() {
 }
 
 // 创建进程
-pub fn process_create(entry_point: u64, stack_size: u64) -> Option<usize> {
+pub fn process_create(entry_point: u64, _stack_size: u64) -> Option<usize> {
     unsafe {
         // 分配PID
         let pid = NEXT_PID;
-        if pid >= PROCESSES.len() {
+        if pid >= 64 {
             return None;
         }
         NEXT_PID += 1;

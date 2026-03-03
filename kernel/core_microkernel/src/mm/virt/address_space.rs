@@ -18,11 +18,13 @@ impl AddressSpace {
     }
     
     // 获取页表根目录地址
+    #[allow(dead_code)]
     pub fn page_table_root(&self) -> u64 {
         self.page_table_root
     }
     
     // 设置页表根目录地址
+    #[allow(dead_code)]
     pub fn set_page_table_root(&mut self, root: u64) {
         self.page_table_root = root;
     }
@@ -60,7 +62,7 @@ impl AddressSpace {
             let pml4 = core::slice::from_raw_parts_mut(self.page_table_root as *mut u64, 512);
             
             // 获取或创建PDPT
-            let mut pdpt_addr = if (pml4[pml4_index] & 1) != 0 {
+            let pdpt_addr = if (pml4[pml4_index] & 1) != 0 {
                 pml4[pml4_index] & !0xFFF
             } else {
                 let addr = physical::allocate_page().expect("Failed to allocate PDPT");
@@ -74,7 +76,7 @@ impl AddressSpace {
             
             // 获取或创建PD
             let pdpt = core::slice::from_raw_parts_mut(pdpt_addr as *mut u64, 512);
-            let mut pd_addr = if (pdpt[pdpt_index] & 1) != 0 {
+            let pd_addr = if (pdpt[pdpt_index] & 1) != 0 {
                 pdpt[pdpt_index] & !0xFFF
             } else {
                 let addr = physical::allocate_page().expect("Failed to allocate PD");
@@ -88,7 +90,7 @@ impl AddressSpace {
             
             // 获取或创建PT
             let pd = core::slice::from_raw_parts_mut(pd_addr as *mut u64, 512);
-            let mut pt_addr = if (pd[pd_index] & 1) != 0 {
+            let pt_addr = if (pd[pd_index] & 1) != 0 {
                 pd[pd_index] & !0xFFF
             } else {
                 let addr = physical::allocate_page().expect("Failed to allocate PT");
@@ -107,6 +109,7 @@ impl AddressSpace {
     }
     
     // 解除虚拟地址映射
+    #[allow(dead_code)]
     pub fn unmap(&mut self, virtual_addr: u64) {
         if self.page_table_root == 0 {
             return;
@@ -155,6 +158,7 @@ impl AddressSpace {
     }
     
     // 查找虚拟地址对应的物理地址
+    #[allow(dead_code)]
     pub fn translate(&self, virtual_addr: u64) -> Option<u64> {
         if self.page_table_root == 0 {
             return None;
@@ -225,10 +229,16 @@ impl AddressSpace {
 // 页表标志位
 pub const PAGE_FLAG_PRESENT: u64 = 1 << 0;
 pub const PAGE_FLAG_WRITABLE: u64 = 1 << 1;
+#[allow(dead_code)]
 pub const PAGE_FLAG_USER: u64 = 1 << 2;
+#[allow(dead_code)]
 pub const PAGE_FLAG_PWT: u64 = 1 << 3;
+#[allow(dead_code)]
 pub const PAGE_FLAG_PCD: u64 = 1 << 4;
+#[allow(dead_code)]
 pub const PAGE_FLAG_ACCESSED: u64 = 1 << 5;
+#[allow(dead_code)]
 pub const PAGE_FLAG_DIRTY: u64 = 1 << 6;
+#[allow(dead_code)]
 pub const PAGE_FLAG_PSE: u64 = 1 << 7;
 pub const PAGE_FLAG_GLOBAL: u64 = 1 << 8;

@@ -113,11 +113,11 @@ fn efi_main(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status
     println!("准备跳转到内核...");
     jump_to_kernel(kernel_address, &boot_info);
 
-    Status::SUCCESS
+
 }
 
 /// 加载内核文件到指定地址
-fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle, target_address: u64) -> Result<(u64, u64), Status> {
+fn load_kernel(_system_table: &SystemTable<Boot>, _image_handle: Handle, target_address: u64) -> Result<(u64, u64), Status> {
     // 暂时返回一个模拟的内核地址和大小
     // 实际实现需要读取文件系统和加载内核文件
     Ok((target_address, 1024 * 1024)) // 假设内核大小为1MB
@@ -133,10 +133,5 @@ fn jump_to_kernel(kernel_address: u64, boot_info: &BootInfo) -> ! {
         
         // 跳转到内核
         kernel_entry(boot_info as *const _ as *mut _);
-    }
-    
-    // 无限循环，以防跳转失败
-    loop {
-        unsafe { core::arch::asm!("hlt"); }
     }
 }
