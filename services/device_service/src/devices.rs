@@ -2,6 +2,7 @@ use super::{Device, DeviceError, DeviceNumber, CharacterDevice, DisplayDevice};
 use core::ffi::c_void;
 
 // 显示模式枚举
+#[derive(Clone, Copy)]
 pub enum DisplayMode {
     Text,
     Graphics,
@@ -10,15 +11,32 @@ pub enum DisplayMode {
 // 键盘操作接口
 pub mod keyboard {
     pub fn init() {
-        // 实际实现将在集成时提供
+        // 调用内核的键盘初始化函数
+        unsafe {
+            extern "C" { fn keyboard_init(); }
+            keyboard_init();
+        }
     }
     
     pub fn read_key() -> Option<char> {
-        None
+        // 调用内核的键盘读取函数，使用 u8 作为 FFI 安全类型
+        unsafe {
+            extern "C" { fn keyboard_read_key() -> u8; }
+            let key = keyboard_read_key();
+            if key != 0 {
+                Some(key as char)
+            } else {
+                None
+            }
+        }
     }
     
     pub fn has_key() -> bool {
-        false
+        // 调用内核的键盘检查函数
+        unsafe {
+            extern "C" { fn keyboard_has_key() -> bool; }
+            keyboard_has_key()
+        }
     }
 }
 
@@ -58,6 +76,12 @@ pub mod vga {
 // 键盘设备实现
 pub struct KeyboardDevice {
     device_number: DeviceNumber,
+}
+
+impl Default for KeyboardDevice {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl KeyboardDevice {
@@ -120,6 +144,12 @@ impl CharacterDevice for KeyboardDevice {
 // VGA设备实现
 pub struct VGADevice {
     device_number: DeviceNumber,
+}
+
+impl Default for VGADevice {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VGADevice {

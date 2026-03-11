@@ -6,6 +6,13 @@ use crate::console;
 // 物理内存页大小
 pub const PAGE_SIZE: usize = 4096;
 
+// 空闲块结构
+struct FreeBlock {
+    start_frame: usize,
+    size: usize, // 以页为单位
+    next: Option<*mut FreeBlock>,
+}
+
 // 物理内存管理器
 struct PhysicalMemoryManager {
     // 位图用于跟踪页帧分配
@@ -16,14 +23,15 @@ struct PhysicalMemoryManager {
     allocated_frames: usize,
     // 物理内存起始地址
     _physical_memory_start: u64,
+    // 空闲块链表
+    free_list: Option<*mut FreeBlock>,
 }
 
 // 全局物理内存管理器
 static mut PHYSICAL_MEMORY_MANAGER: Option<PhysicalMemoryManager> = None;
 
 // 初始化物理内存管理
-pub fn init(boot_info: *mut BootInfo) {
-    unsafe {
+pub unsafe fn init(boot_info: *mut BootInfo) {
         // 解析内存映射
         let memory_map = (*boot_info).memory_map;
         let memory_map_count = (*boot_info).memory_map_count;
@@ -140,56 +148,181 @@ pub fn init(boot_info: *mut BootInfo) {
             total_frames,
             allocated_frames: 0,
             _physical_memory_start: 0,
+            free_list: None,
         });
-    }
+        
+        // 初始化空闲块链表
+        build_free_list();
 }
 
-// 分配物理内存页
-pub fn allocate_page() -> Option<usize> {
+// 构建空闲块链表
+fn build_free_list() {
     unsafe {
         if let Some(ref mut manager) = PHYSICAL_MEMORY_MANAGER {
-            // 查找第一个可用的页帧
-            for (byte_index, &byte) in manager.bitmap.iter().enumerate() {
-                if byte != 0xFF {
-                    // 找到一个有可用位的字节
-                    for bit_index in 0..8 {
-                        if (byte & (1 << bit_index)) == 0 {
-                            // 找到可用页帧
-                            let frame = byte_index * 8 + bit_index;
-                            if frame < manager.total_frames {
-                                // 标记为已分配
-                                manager.bitmap[byte_index] |= 1 << bit_index;
-                                manager.allocated_frames += 1;
-                                
-                                // 计算物理地址
-                                let physical_address = frame * PAGE_SIZE;
-                                return Some(physical_address);
+            let mut current_start = None;
+            let mut current_size = 0;
+            
+            // 遍历所有页帧
+            for frame in 0..manager.total_frames {
+                let byte_index = frame / 8;
+                let bit_index = frame % 8;
+                
+                if byte_index < manager.bitmap.len() {
+                    let is_free = (manager.bitmap[byte_index] & (1 << bit_index)) == 0;
+                    
+                    if is_free {
+                        // 当前页帧是空闲的
+                        if current_start.is_none() {
+                            current_start = Some(frame);
+                        }
+                        current_size += 1;
+                    } else {
+                        // 当前页帧已分配，结束当前空闲块
+                        if current_start.is_some() {
+                            if let Err(_) = add_free_block(current_start.unwrap(), current_size) {
+                                // 记录错误但继续执行
+                                crate::console::print(core::format_args!("警告: 添加空闲块失败\n"));
                             }
+                            current_start = None;
+                            current_size = 0;
                         }
                     }
                 }
             }
+            
+            // 处理最后一个空闲块
+            if current_start.is_some() {
+                if let Err(_) = add_free_block(current_start.unwrap(), current_size) {
+                    // 记录错误但继续执行
+                    crate::console::print(core::format_args!("警告: 添加最后一个空闲块失败\n"));
+                }
+            }
         }
-        None
+    }
+}
+
+// 添加空闲块到链表
+fn add_free_block(start_frame: usize, size: usize) -> Result<(), AllocError> {
+    unsafe {
+        if let Some(ref mut manager) = PHYSICAL_MEMORY_MANAGER {
+            // 分配空闲块结构
+            match allocate_page() {
+                Ok(block_addr) => {
+                    let block = block_addr as *mut FreeBlock;
+                    (*block).start_frame = start_frame;
+                    (*block).size = size;
+                    (*block).next = manager.free_list;
+                    
+                    // 添加到链表头部
+                    manager.free_list = Some(block);
+                    Ok(())
+                },
+                Err(err) => Err(err),
+            }
+        } else {
+            Err(AllocError::InternalError)
+        }
+    }
+}
+
+// 内存分配错误类型
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum AllocError {
+    OutOfMemory,
+    InvalidAddress,
+    InternalError,
+}
+
+// 分配物理内存页
+pub fn allocate_page() -> Result<usize, AllocError> {
+    unsafe {
+        if let Some(ref mut manager) = PHYSICAL_MEMORY_MANAGER {
+            // 使用空闲块链表查找可用页帧
+            let mut prev: Option<*mut FreeBlock> = None;
+            let mut current = manager.free_list;
+            
+            while let Some(block) = current {
+                if (*block).size >= 1 {
+                    // 找到足够大的空闲块
+                    let frame = (*block).start_frame;
+                    
+                    // 验证内存区域大小
+                    if frame >= manager.total_frames {
+                        return Err(AllocError::InvalidAddress);
+                    }
+                    
+                    // 标记为已分配
+                    let byte_index = frame / 8;
+                    let bit_index = frame % 8;
+                    if byte_index < manager.bitmap.len() {
+                        manager.bitmap[byte_index] |= 1 << bit_index;
+                        manager.allocated_frames += 1;
+                    } else {
+                        return Err(AllocError::InternalError);
+                    }
+                    
+                    // 更新空闲块
+                    (*block).start_frame += 1;
+                    (*block).size -= 1;
+                    
+                    // 如果块大小为0，从链表中移除
+                    if (*block).size == 0 {
+                        if let Some(prev_block) = prev {
+                            (*prev_block).next = (*block).next;
+                        } else {
+                            manager.free_list = (*block).next;
+                        }
+                        // 释放空闲块结构
+                        if let Err(_) = free_page(block as usize) {
+                            // 记录错误但继续执行
+                            crate::console::print(core::format_args!("警告: 释放空闲块结构失败\n"));
+                        }
+                    }
+                    
+                    // 计算物理地址
+                    let physical_address = frame * PAGE_SIZE;
+                    return Ok(physical_address);
+                }
+                
+                prev = current;
+                current = (*block).next;
+            }
+            return Err(AllocError::OutOfMemory);
+        }
+        Err(AllocError::InternalError)
     }
 }
 
 // 释放物理内存页
-pub fn free_page(physical_address: usize) {
+pub fn free_page(physical_address: usize) -> Result<(), AllocError> {
     unsafe {
         if let Some(ref mut manager) = PHYSICAL_MEMORY_MANAGER {
+            // 检查物理地址是否页对齐
+            if physical_address % PAGE_SIZE != 0 {
+                return Err(AllocError::InvalidAddress); // 物理地址不是页对齐的
+            }
+            
             // 计算页帧号
             let frame = physical_address / PAGE_SIZE;
-            if frame < manager.total_frames {
-                // 标记为未分配
-                let byte_index = frame / 8;
-                let bit_index = frame % 8;
-                if byte_index < manager.bitmap.len() {
-                    manager.bitmap[byte_index] &= !(1 << bit_index);
-                    manager.allocated_frames -= 1;
-                }
+            if frame >= manager.total_frames {
+                return Err(AllocError::InvalidAddress);
+            }
+            
+            // 标记为未分配
+            let byte_index = frame / 8;
+            let bit_index = frame % 8;
+            if byte_index < manager.bitmap.len() {
+                manager.bitmap[byte_index] &= !(1 << bit_index);
+                manager.allocated_frames -= 1;
+                
+                // 添加到空闲块链表
+                let _ = add_free_block(frame, 1);
+                return Ok(());
+            } else {
+                return Err(AllocError::InternalError);
             }
         }
+        Err(AllocError::InternalError)
     }
 }
 

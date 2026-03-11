@@ -20,6 +20,7 @@ pub struct BootInfo {
 // 内存映射条目
 #[repr(C)]
 #[derive(Copy, Clone)]
+#[derive(Default)]
 pub struct MemoryMapEntry {
     pub physical_start: u64,
     pub virtual_start: u64,
@@ -30,6 +31,7 @@ pub struct MemoryMapEntry {
 
 // 帧缓冲区信息
 #[repr(C)]
+#[derive(Default)]
 pub struct FramebufferInfo {
     pub address: u64,
     pub width: u32,
@@ -39,29 +41,7 @@ pub struct FramebufferInfo {
 }
 
 // 默认实现
-impl Default for MemoryMapEntry {
-    fn default() -> Self {
-        Self {
-            physical_start: 0,
-            virtual_start: 0,
-            number_of_pages: 0,
-            memory_type: 0,
-            attribute: 0,
-        }
-    }
-}
 
-impl Default for FramebufferInfo {
-    fn default() -> Self {
-        Self {
-            address: 0,
-            width: 0,
-            height: 0,
-            pitch: 0,
-            bpp: 0,
-        }
-    }
-}
 
 #[entry]
 fn efi_main(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
@@ -71,7 +51,7 @@ fn efi_main(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status
     println!("正在初始化...");
 
     // 获取内存映射
-    let mut memory_map_buffer = [0u8; 4096];
+    let mut memory_map_buffer = [0u8; 16384];
     let memory_map = system_table.boot_services().memory_map(&mut memory_map_buffer).expect("Failed to get memory map");
     println!("内存映射获取成功: {} 个条目", memory_map.entries().count());
 
@@ -106,7 +86,7 @@ fn efi_main(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status
         memory_map_count: entry_count,
         framebuffer: framebuffer_info,
         kernel_base: kernel_address,
-        kernel_size: kernel_size,
+        kernel_size,
     };
 
     // 跳转到内核

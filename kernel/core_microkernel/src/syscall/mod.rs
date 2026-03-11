@@ -10,11 +10,14 @@ extern "C" fn syscall_entry(rax: usize, rdi: usize, rsi: usize, rdx: usize, rcx:
 
 // 初始化系统调用
 pub fn init() {
+    // 初始化文件系统
+    syscall::init_fs();
+    
     // 配置系统调用寄存器
     unsafe {
         // 设置LSTAR寄存器，指向系统调用入口点
         core::arch::asm!(
-            "mov rax, syscall_entry",
+            "lea rax, [rip+syscall_entry]",
             "mov rcx, 0xC0000082", // LSTAR
             "wrmsr",
             options(nostack)

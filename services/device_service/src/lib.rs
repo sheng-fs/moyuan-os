@@ -1,6 +1,7 @@
 #![no_std]
 
 use core::ffi::c_void;
+use spin::Mutex;
 
 // 设备错误类型
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -28,7 +29,7 @@ pub enum DeviceType {
 }
 
 // 设备抽象接口
-pub trait Device {
+pub trait Device: Sync {
     // 设备初始化
     fn init(&self) -> Result<(), DeviceError>;
     
@@ -87,7 +88,14 @@ pub trait BlockDevice: Device {
 // 设备注册表
 pub struct DeviceRegistry {
     devices: [Option<&'static dyn Device>; 256], // 最多支持256个设备
+    #[allow(dead_code)]
     next_minor: [u16; 256], // 每个主设备号对应的下一个次设备号
+}
+
+impl Default for DeviceRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DeviceRegistry {
@@ -145,16 +153,14 @@ impl DeviceRegistry {
     
     // 遍历所有设备
     pub fn for_each_device<F>(&self, mut f: F) where F: FnMut(&dyn Device) {
-        for device_option in self.devices.iter() {
-            if let Some(device) = device_option {
-                f(*device);
-            }
+        for device in self.devices.iter().flatten() {
+            f(*device);
         }
     }
 }
 
 // 全局设备注册表
-static mut DEVICE_REGISTRY: DeviceRegistry = DeviceRegistry::new();
+static DEVICE_REGISTRY: Mutex<DeviceRegistry> = Mutex::new(DeviceRegistry::new());
 
 // 导出设备实现
 pub mod devices;
@@ -162,45 +168,41 @@ pub mod devices;
 // 初始化设备服务
 pub fn init() {
     // 初始化设备注册表
-    unsafe {
-        // 注册键盘设备
-        if let Ok(_device_num) = DEVICE_REGISTRY.register_device(&devices::KEYBOARD_DEVICE) {
-            // 实际实现中将使用适当的日志或打印机制
-            devices::KEYBOARD_DEVICE.init().unwrap();
-        }
-        
-        // 注册VGA设备
-        if let Ok(_device_num) = DEVICE_REGISTRY.register_device(&devices::VGA_DEVICE) {
-            // 实际实现中将使用适当的日志或打印机制
-            devices::VGA_DEVICE.init().unwrap();
-        }
+    let mut registry = DEVICE_REGISTRY.lock();
+    
+    // 注册键盘设备
+    if let Ok(_device_num) = registry.register_device(&devices::KEYBOARD_DEVICE) {
+        // 实际实现中将使用适当的日志或打印机制
+        devices::KEYBOARD_DEVICE.init().unwrap();
+    }
+    
+    // 注册VGA设备
+    if let Ok(_device_num) = registry.register_device(&devices::VGA_DEVICE) {
+        // 实际实现中将使用适当的日志或打印机制
+        devices::VGA_DEVICE.init().unwrap();
     }
 }
 
 // 注册设备
 pub fn register_device(device: &'static dyn Device) -> Result<DeviceNumber, DeviceError> {
-    unsafe {
-        DEVICE_REGISTRY.register_device(device)
-    }
+    let mut registry = DEVICE_REGISTRY.lock();
+    registry.register_device(device)
 }
 
 // 注销设备
 pub fn unregister_device(device_num: DeviceNumber) -> Result<(), DeviceError> {
-    unsafe {
-        DEVICE_REGISTRY.unregister_device(device_num)
-    }
+    let mut registry = DEVICE_REGISTRY.lock();
+    registry.unregister_device(device_num)
 }
 
 // 查找设备
 pub fn find_device(device_num: DeviceNumber) -> Option<&'static dyn Device> {
-    unsafe {
-        DEVICE_REGISTRY.find_device(device_num)
-    }
+    let registry = DEVICE_REGISTRY.lock();
+    registry.find_device(device_num)
 }
 
 // 遍历所有设备
 pub fn for_each_device<F>(f: F) where F: FnMut(&dyn Device) {
-    unsafe {
-        DEVICE_REGISTRY.for_each_device(f)
-    }
+    let registry = DEVICE_REGISTRY.lock();
+    registry.for_each_device(f)
 }

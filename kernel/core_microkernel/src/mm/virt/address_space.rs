@@ -32,16 +32,22 @@ impl AddressSpace {
     // 初始化页表
     pub fn init(&mut self) {
         // 分配页表根目录（PML4）
-        if let Some(pml4_addr) = physical::allocate_page() {
-            self.page_table_root = pml4_addr as u64;
-            // 清空页表
-            unsafe {
-                let pml4 = core::slice::from_raw_parts_mut(pml4_addr as *mut u64, 512);
-                for entry in pml4.iter_mut() {
-                    *entry = 0;
+        match physical::allocate_page() {
+            Ok(pml4_addr) => {
+                self.page_table_root = pml4_addr as u64;
+                // 清空页表
+                unsafe {
+                    let pml4 = core::slice::from_raw_parts_mut(pml4_addr as *mut u64, 512);
+                    for entry in pml4.iter_mut() {
+                        *entry = 0;
+                    }
                 }
+                console::print(core::format_args!("页表根目录初始化成功: {:#x}\n", self.page_table_root));
+            },
+            Err(err) => {
+                console::print(core::format_args!("错误: 分配页表根目录失败: {:?}\n", err));
+                self.page_table_root = 0;
             }
-            console::print(core::format_args!("页表根目录初始化成功: {:#x}\n", self.page_table_root));
         }
     }
     
@@ -50,6 +56,9 @@ impl AddressSpace {
         if self.page_table_root == 0 {
             self.init();
         }
+        
+        // 验证物理地址是否页对齐
+        debug_assert!(physical_addr & 0xFFF == 0, "物理地址未对齐到页边界: {:#x}", physical_addr);
         
         // 解析虚拟地址
         let pml4_index = ((virtual_addr >> 39) & 0x1FF) as usize;
@@ -63,48 +72,87 @@ impl AddressSpace {
             
             // 获取或创建PDPT
             let pdpt_addr = if (pml4[pml4_index] & 1) != 0 {
-                pml4[pml4_index] & !0xFFF
+                let addr = pml4[pml4_index] & !0xFFF;
+                // 验证PDPT地址是否页对齐
+                debug_assert!(addr & 0xFFF == 0, "PDPT地址未对齐到页边界: {:#x}", addr);
+                addr
             } else {
-                let addr = physical::allocate_page().expect("Failed to allocate PDPT");
-                pml4[pml4_index] = addr as u64 | flags | 1;
-                let pdpt = core::slice::from_raw_parts_mut(addr as *mut u64, 512);
-                for entry in pdpt.iter_mut() {
-                    *entry = 0;
+                match physical::allocate_page() {
+                    Ok(addr) => {
+                        // 验证分配的地址是否页对齐
+                        debug_assert!(addr & 0xFFF == 0, "分配的PDPT地址未对齐到页边界: {:#x}", addr);
+                        pml4[pml4_index] = addr as u64 | flags | 1;
+                        let pdpt = core::slice::from_raw_parts_mut(addr as *mut u64, 512);
+                        for entry in pdpt.iter_mut() {
+                            *entry = 0;
+                        }
+                        addr as u64
+                    },
+                    Err(err) => {
+                        crate::console::print(core::format_args!("错误: 分配PDPT失败: {:?}\n", err));
+                        return;
+                    }
                 }
-                addr as u64
             };
             
             // 获取或创建PD
             let pdpt = core::slice::from_raw_parts_mut(pdpt_addr as *mut u64, 512);
             let pd_addr = if (pdpt[pdpt_index] & 1) != 0 {
-                pdpt[pdpt_index] & !0xFFF
+                let addr = pdpt[pdpt_index] & !0xFFF;
+                // 验证PD地址是否页对齐
+                debug_assert!(addr & 0xFFF == 0, "PD地址未对齐到页边界: {:#x}", addr);
+                addr
             } else {
-                let addr = physical::allocate_page().expect("Failed to allocate PD");
-                pdpt[pdpt_index] = addr as u64 | flags | 1;
-                let pd = core::slice::from_raw_parts_mut(addr as *mut u64, 512);
-                for entry in pd.iter_mut() {
-                    *entry = 0;
+                match physical::allocate_page() {
+                    Ok(addr) => {
+                        // 验证分配的地址是否页对齐
+                        debug_assert!(addr & 0xFFF == 0, "分配的PD地址未对齐到页边界: {:#x}", addr);
+                        pdpt[pdpt_index] = addr as u64 | flags | 1;
+                        let pd = core::slice::from_raw_parts_mut(addr as *mut u64, 512);
+                        for entry in pd.iter_mut() {
+                            *entry = 0;
+                        }
+                        addr as u64
+                    },
+                    Err(err) => {
+                        crate::console::print(core::format_args!("错误: 分配PD失败: {:?}\n", err));
+                        return;
+                    }
                 }
-                addr as u64
             };
             
             // 获取或创建PT
             let pd = core::slice::from_raw_parts_mut(pd_addr as *mut u64, 512);
             let pt_addr = if (pd[pd_index] & 1) != 0 {
-                pd[pd_index] & !0xFFF
+                let addr = pd[pd_index] & !0xFFF;
+                // 验证PT地址是否页对齐
+                debug_assert!(addr & 0xFFF == 0, "PT地址未对齐到页边界: {:#x}", addr);
+                addr
             } else {
-                let addr = physical::allocate_page().expect("Failed to allocate PT");
-                pd[pd_index] = addr as u64 | flags | 1;
-                let pt = core::slice::from_raw_parts_mut(addr as *mut u64, 512);
-                for entry in pt.iter_mut() {
-                    *entry = 0;
+                match physical::allocate_page() {
+                    Ok(addr) => {
+                        // 验证分配的地址是否页对齐
+                        debug_assert!(addr & 0xFFF == 0, "分配的PT地址未对齐到页边界: {:#x}", addr);
+                        pd[pd_index] = addr as u64 | flags | 1;
+                        let pt = core::slice::from_raw_parts_mut(addr as *mut u64, 512);
+                        for entry in pt.iter_mut() {
+                            *entry = 0;
+                        }
+                        addr as u64
+                    },
+                    Err(err) => {
+                        crate::console::print(core::format_args!("错误: 分配PT失败: {:?}\n", err));
+                        return;
+                    }
                 }
-                addr as u64
             };
             
             // 设置页表项
             let pt = core::slice::from_raw_parts_mut(pt_addr as *mut u64, 512);
-            pt[pt_index] = (physical_addr & !0xFFF) | flags | 1;
+            // 确保物理地址对齐到页边界
+            let aligned_physical_addr = physical_addr & !0xFFF;
+            debug_assert!(aligned_physical_addr & 0xFFF == 0, "物理地址未对齐到页边界: {:#x}", aligned_physical_addr);
+            pt[pt_index] = aligned_physical_addr | flags | 1;
         }
     }
     
@@ -223,6 +271,37 @@ impl AddressSpace {
                 );
             }
         }
+    }
+    
+    // 释放地址空间资源
+    pub fn deinit(&mut self) {
+        if self.page_table_root != 0 {
+            unsafe {
+                // 释放页表结构
+                self.free_page_tables(self.page_table_root);
+                
+                // 重置页表根目录地址
+                self.page_table_root = 0;
+            }
+        }
+    }
+    
+    // 递归释放页表
+    unsafe fn free_page_tables(&self, table_addr: u64) {
+        let table = core::slice::from_raw_parts_mut(table_addr as *mut u64, 512);
+        
+        // 遍历页表项
+        for entry in table.iter() {
+            if (*entry & 1) != 0 {
+                let child_addr = *entry & !0xFFF;
+                // 检查是否是叶子页表（PT）
+                // 这里简化处理，假设所有非叶子页表都需要递归释放
+                self.free_page_tables(child_addr);
+            }
+        }
+        
+        // 释放当前页表
+        let _ = physical::free_page(table_addr as usize);
     }
 }
 

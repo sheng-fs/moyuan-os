@@ -22,8 +22,10 @@ members = [
 [profile.dev]
 debug = true
 opt-level = 0
+panic = "abort"
 
 [profile.release]
 debug = false
 opt-level = 3
 lto = true
+panic = "abort"

@@ -377,7 +377,24 @@ pub fn init() {
     }
 }
 
+// 导出给设备服务的函数
+#[no_mangle]
+extern "C" fn keyboard_init() {
+    init();
+}
+
+#[no_mangle]
+extern "C" fn keyboard_read_key() -> Option<char> {
+    read_key()
+}
+
+#[no_mangle]
+extern "C" fn keyboard_has_key() -> bool {
+    has_key()
+}
+
 // 检查是否有可用输入
+#[allow(dead_code)]
 pub fn has_key() -> bool {
     unsafe {
         BUFFER_HEAD != BUFFER_TAIL
@@ -385,6 +402,7 @@ pub fn has_key() -> bool {
 }
 
 // 非阻塞读取一个字符
+#[allow(dead_code)]
 pub fn read_key() -> Option<char> {
     unsafe {
         if BUFFER_HEAD != BUFFER_TAIL {
@@ -398,6 +416,7 @@ pub fn read_key() -> Option<char> {
 }
 
 // 清空输入缓冲区
+#[allow(dead_code)]
 pub fn clear_buffer() {
     unsafe {
         BUFFER_HEAD = 0;

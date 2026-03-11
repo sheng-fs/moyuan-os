@@ -33,7 +33,32 @@ pub struct FramebufferInfo {
     pub bpp: u32,
 }
 
-// 导出各个模块
+// 全局内存分配器实现
+struct DummyAllocator;
+
+unsafe impl core::alloc::GlobalAlloc for DummyAllocator {
+    unsafe fn alloc(&self, _layout: core::alloc::Layout) -> *mut u8 {
+        // 从物理内存分配器分配内存
+        crate::mm::physical::allocate_page().unwrap() as *mut u8
+    }
+    
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: core::alloc::Layout) {
+        // 释放内存
+        let _ = crate::mm::physical::free_page(ptr as usize);
+    }
+}
+
+// 注册全局内存分配器
+#[global_allocator]
+static GLOBAL_ALLOCATOR: DummyAllocator = DummyAllocator;
+
+// 定义 panic 处理函数
+#[cfg(not(test))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+
 pub mod console;
 pub mod interrupt;
 pub mod mm;
@@ -45,7 +70,9 @@ pub fn init() {
     // 初始化内存管理
     // 注意：物理内存管理需要从 boot_info 获取内存映射
     // 这里暂时使用空指针，实际使用时需要传递正确的 boot_info
-    mm::physical::init(core::ptr::null_mut());
+    unsafe {
+        mm::physical::init(core::ptr::null_mut());
+    }
     mm::virt::init();
     
     // 初始化中断处理

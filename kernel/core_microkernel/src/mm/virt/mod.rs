@@ -12,10 +12,9 @@ pub fn init() {
         let mut address_space = address_space::AddressSpace::new();
         address_space.init();
         
-        // 映射内核代码和数据
-        // 这里需要根据实际的内核布局进行映射
-        // 暂时映射物理内存的前1GB
-        for i in 0..(1024 * 1024 * 1024 / 4096) {
+        // 作为 fallback，映射物理内存的前16MB
+        crate::console::print(core::format_args!("使用默认映射方案\n"));
+        for i in 0..(16 * 1024 * 1024 / 4096) {
             let physical_addr = i * 4096;
             let virtual_addr = physical_addr as u64;
             address_space.map(virtual_addr, physical_addr as u64, PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE | PAGE_FLAG_GLOBAL);

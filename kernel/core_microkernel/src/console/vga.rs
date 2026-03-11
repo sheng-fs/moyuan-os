@@ -8,8 +8,10 @@ const VGA_WIDTH: usize = 80;
 const VGA_HEIGHT: usize = 25;
 
 // 显示模式枚举
+#[allow(dead_code)]
 pub enum DisplayMode {
     Text,
+    #[allow(dead_code)]
     Graphics,
 }
 
@@ -23,9 +25,11 @@ const WHITE_ON_BLACK: u8 = 0x0F;
 
 // 图形模式状态
 static mut FRAMEBUFFER_ADDR: u64 = 0;
+#[allow(dead_code)]
 static mut FRAMEBUFFER_WIDTH: usize = 1024;
 static mut FRAMEBUFFER_HEIGHT: usize = 768;
 static mut FRAMEBUFFER_PITCH: usize = 0;
+#[allow(dead_code)]
 static mut FRAMEBUFFER_BPP: usize = 32;
 
 /// 初始化VGA
@@ -38,7 +42,57 @@ pub fn init() {
     }
 }
 
+/// 显示系统LOGO（像素化）
+pub fn display_logo() {
+    // 像素化的系统LOGO
+    // 这里使用简单的ASCII艺术来表示系统LOGO
+    let logo = [
+        "                                    ",
+        "          ██╗    ██╗██╗  ██╗           ",
+        "          ██║    ██║╚██╗██╔╝           ",
+        "          ██║ █╗ ██║ ╚███╔╝            ",
+        "          ██║███╗██║ ██╔██╗            ",
+        "          ╚███╔███╔╝██╔╝ ██╗           ",
+        "           ╚══╝╚══╝ ╚═╝  ╚═╝           ",
+        "                                    ",
+        "      ███████╗██╗   ██╗██████╗        ",
+        "      ██╔════╝██║   ██║██╔══██╗       ",
+        "      ███████╗██║   ██║██████╔╝       ",
+        "      ╚════██║██║   ██║██╔═══╝        ",
+        "      ███████║╚██████╔╝██║            ",
+        "      ╚══════╝ ╚═════╝ ╚═╝            ",
+        "                                    ",
+    ];
+    
+    // 显示LOGO
+    for (y, line) in logo.iter().enumerate() {
+        for (x, c) in line.chars().enumerate() {
+            print_char(c, x + 20, y + 5, 0x0F, 0x00); // 白色文字，黑色背景
+        }
+    }
+}
+
+/// 加载并显示终端背景
+pub fn load_background() {
+    // 这里简化处理，实际应该从文件加载背景
+    // 目前使用简单的背景效果
+    unsafe {
+        for y in 0..VGA_HEIGHT {
+            for x in 0..VGA_WIDTH {
+                let color = if (x + y) % 8 < 4 {
+                    0x01 // 深蓝色背景
+                } else {
+                    0x00 // 黑色背景
+                };
+                let index = y * VGA_WIDTH + x;
+                *VGA_BUFFER.offset(index as isize) = 0x20 | (color as u16) << 8;
+            }
+        }
+    }
+}
+
 /// 设置帧缓冲区信息（用于图形模式）
+#[allow(dead_code)]
 pub fn set_framebuffer(addr: u64, width: usize, height: usize, pitch: usize, bpp: usize) {
     unsafe {
         FRAMEBUFFER_ADDR = addr;
@@ -50,6 +104,7 @@ pub fn set_framebuffer(addr: u64, width: usize, height: usize, pitch: usize, bpp
 }
 
 /// 设置显示模式
+#[allow(dead_code)]
 pub fn set_mode(mode: DisplayMode) {
     unsafe {
         CURRENT_MODE = mode;
@@ -105,6 +160,7 @@ fn scroll() {
 }
 
 /// 设置光标位置
+#[allow(dead_code)]
 pub fn set_cursor_pos(x: usize, y: usize) {
     unsafe {
         if x < VGA_WIDTH && y < VGA_HEIGHT {
@@ -152,6 +208,7 @@ pub fn put_char(c: char) {
 }
 
 /// 在指定位置显示字符
+#[allow(dead_code)]
 pub fn print_char(c: char, x: usize, y: usize, fg_color: u8, bg_color: u8) {
     unsafe {
         if x < VGA_WIDTH && y < VGA_HEIGHT {
@@ -178,6 +235,7 @@ pub fn print(args: fmt::Arguments) {
 }
 
 /// 绘制像素（图形模式）
+#[allow(dead_code)]
 pub fn draw_pixel(x: usize, y: usize, color: u32) {
     unsafe {
         if let DisplayMode::Graphics = CURRENT_MODE {
@@ -196,6 +254,7 @@ pub fn draw_pixel(x: usize, y: usize, color: u32) {
 }
 
 /// 绘制直线（图形模式）
+#[allow(dead_code)]
 pub fn draw_line(x1: usize, y1: usize, x2: usize, y2: usize, color: u32) {
     // 使用Bresenham算法绘制直线
     let mut x = x1 as isize;
@@ -224,6 +283,7 @@ pub fn draw_line(x1: usize, y1: usize, x2: usize, y2: usize, color: u32) {
 }
 
 /// 绘制矩形（图形模式）
+#[allow(dead_code)]
 pub fn draw_rect(x: usize, y: usize, width: usize, height: usize, color: u32, filled: bool) {
     if filled {
         // 绘制填充矩形

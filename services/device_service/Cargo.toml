@@ -7,6 +7,7 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
+spin = "0.9.8"
 
 [profile.dev]
 debug = true

@@ -4,7 +4,6 @@
 #[cfg(all(not(feature = "test"), not(test)))]
 use core::panic::PanicInfo;
 
-
 // 导入各个模块
 mod mm;
 mod task;
@@ -12,8 +11,30 @@ mod syscall;
 mod interrupt;
 mod console;
 
+// 导入全局内存分配器
+use crate::mm::physical;
+
+// 全局内存分配器实现
+struct DummyAllocator;
+
+unsafe impl core::alloc::GlobalAlloc for DummyAllocator {
+    unsafe fn alloc(&self, _layout: core::alloc::Layout) -> *mut u8 {
+        // 从物理内存分配器分配内存
+        physical::allocate_page().unwrap() as *mut u8
+    }
+    
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: core::alloc::Layout) {
+        // 释放内存
+        let _ = physical::free_page(ptr as usize);
+    }
+}
+
+// 注册全局内存分配器
+#[global_allocator]
+static GLOBAL_ALLOCATOR: DummyAllocator = DummyAllocator;
+
 // 导入设备服务
-use services::device_service;
+use moyuan_device_service;
 
 // 启动信息结构
 #[repr(C)]
@@ -48,12 +69,9 @@ pub struct FramebufferInfo {
 
 // 内核主函数
 #[no_mangle]
-extern "C" fn _start() -> ! {
-    // 临时的启动函数，实际的启动逻辑会由UEFI引导加载器调用
-    // 这里只是为了避免链接错误
-    loop {
-        unsafe { core::arch::asm!("hlt"); }
-    }
+extern "C" fn _start(boot_info: *mut BootInfo) -> ! {
+    // 调用 kernel_main 函数
+    kernel_main(boot_info);
 }
 
 // 内核主函数
@@ -61,6 +79,12 @@ extern "C" fn _start() -> ! {
 extern "C" fn kernel_main(boot_info: *mut BootInfo) -> ! {
     // 初始化控制台
     console::init();
+    
+    // 加载终端背景
+    console::vga::load_background();
+    
+    // 显示系统LOGO
+    console::vga::display_logo();
     
     // 打印启动信息
     print!("墨渊操作系统内核启动中...\n");
@@ -95,14 +119,16 @@ fn init_kernel(boot_info: *mut BootInfo) {
     
     // 初始化设备服务
     print!("初始化设备服务...\n");
-    device_service::init();
+    moyuan_device_service::init();
 }
 
 // 初始化内存管理
 fn init_memory(boot_info: *mut BootInfo) {
     // 初始化物理内存管理
     print!("初始化物理内存管理...\n");
-    mm::physical::init(boot_info);
+    unsafe {
+        mm::physical::init(boot_info);
+    }
     
     // 初始化虚拟内存管理
     print!("初始化虚拟内存管理...\n");
@@ -142,9 +168,14 @@ fn test_multiprocess() {
     // 创建两个子进程
     for _i in 0..2 {
         // 这里简化处理，实际应该通过系统调用创建进程
-        if let Some(child_pid) = task::process::process_create(test_process_entry as *const () as u64, 4096) {
-            task::scheduler::add_to_ready_queue(child_pid);
-            print!("创建子进程: {}\n", child_pid);
+        match task::process::process_create(test_process_entry as *const () as u64, 4096) {
+            Ok(child_pid) => {
+                task::scheduler::add_to_ready_queue(child_pid);
+                print!("创建子进程: {}\n", child_pid);
+            }
+            Err(_) => {
+                print!("创建子进程失败\n");
+            }
         }
     }
 }

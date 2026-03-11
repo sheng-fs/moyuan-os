@@ -8,11 +8,18 @@ default = []
 test = []
 
 [dependencies]
-device_service = { path = "../../services/device_service" }
+moyuan-device-service = { path = "../../services/device_service" }
+moyuan-fs-service = { path = "../../services/fs_service" }
+spin = "0.9.8"
 
 [build-dependencies]
+cc = "1.0"
 
 [target.'cfg(target_os = "none")'.dependencies]
+
+[target.x86_64-unknown-none]
+linker = "rust-lld"
+rustflags = ["-C", "link-arg=-Tlinker.ld"]
 
 [profile.dev]
 debug = true

@@ -99,85 +99,147 @@ pub fn register_interrupt_handler(interrupt_number: u8, handler: InterruptHandle
 #[no_mangle]
 extern "C" fn divide_by_zero_handler() -> ! {
     crate::console::print(core::format_args!("除零异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn debug_handler() -> ! {
     crate::console::print(core::format_args!("调试异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn non_maskable_interrupt_handler() -> ! {
     crate::console::print(core::format_args!("不可屏蔽中断\n"));
+    // 不可屏蔽中断通常是致命的，所以使用无限循环
     loop { unsafe { asm!("hlt"); } }
 }
 
 #[no_mangle]
 extern "C" fn breakpoint_handler() -> ! {
     crate::console::print(core::format_args!("断点异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn overflow_handler() -> ! {
     crate::console::print(core::format_args!("溢出异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn bound_range_exceeded_handler() -> ! {
     crate::console::print(core::format_args!("边界范围超出异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn invalid_opcode_handler() -> ! {
     crate::console::print(core::format_args!("无效操作码异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn device_not_available_handler() -> ! {
     crate::console::print(core::format_args!("设备不可用异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn double_fault_handler() -> ! {
     crate::console::print(core::format_args!("双重故障异常\n"));
+    // 双重故障通常是致命的，所以使用无限循环
     loop { unsafe { asm!("hlt"); } }
 }
 
 #[no_mangle]
 extern "C" fn invalid_tss_handler() -> ! {
     crate::console::print(core::format_args!("无效TSS异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn segment_not_present_handler() -> ! {
     crate::console::print(core::format_args!("段不存在异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn stack_segment_fault_handler() -> ! {
     crate::console::print(core::format_args!("栈段故障异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn general_protection_fault_handler() -> ! {
     crate::console::print(core::format_args!("通用保护故障异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 #[no_mangle]
 extern "C" fn page_fault_handler() -> ! {
     crate::console::print(core::format_args!("页故障异常\n"));
-    loop { unsafe { asm!("hlt"); } }
+    unsafe {
+        asm!(
+            "iretq",
+            options(noreturn)
+        );
+    }
 }
 
 // 时钟中断处理函数
@@ -214,40 +276,126 @@ extern "C" fn timer_interrupt_handler() -> ! {
     }
 }
 
+// PIC 结构体
+pub struct Pic {
+    master_mask: u8,
+    slave_mask: u8,
+}
+
+impl Default for Pic {
+    fn default() -> Self {
+        Self {
+            master_mask: 0xFE, // 默认只允许时钟中断
+            slave_mask: 0xFF,  // 默认屏蔽所有从PIC中断
+        }
+    }
+}
+
+impl Pic {
+    // 初始化PIC
+    pub fn init(&mut self) {
+        unsafe {
+            // 初始化主PIC和从PIC
+            asm!(
+                "mov al, 0x11",
+                "out 0x20, al", // 主PIC命令端口
+                "out 0xA0, al", // 从PIC命令端口
+                
+                "mov al, 0x20",
+                "out 0x21, al", // 主PIC数据端口，设置中断向量号从32开始
+                "mov al, 0x28",
+                "out 0xA1, al", // 从PIC数据端口，设置中断向量号从40开始
+                
+                "mov al, 0x04",
+                "out 0x21, al", // 主PIC设置从PIC连接到IRQ2
+                "mov al, 0x02",
+                "out 0xA1, al", // 从PIC设置连接到主PIC的IRQ2
+                
+                "mov al, 0x01",
+                "out 0x21, al", // 主PIC设置为8086模式
+                "out 0xA1, al", // 从PIC设置为8086模式
+                
+                options(nomem, nostack)
+            );
+            
+            // 应用默认掩码
+            self.apply_masks();
+            
+            crate::console::print(core::format_args!("PIC初始化成功\n"));
+        }
+    }
+    
+    // 应用中断掩码
+    fn apply_masks(&self) {
+        unsafe {
+            // 使用 reg_byte 寄存器类处理 u8 类型
+            asm!(
+                "mov al, {master_mask}",
+                "out 0x21, al", // 主PIC数据端口
+                "mov al, {slave_mask}",
+                "out 0xA1, al", // 从PIC数据端口
+                master_mask = in(reg_byte) self.master_mask,
+                slave_mask = in(reg_byte) self.slave_mask,
+                options(nomem, nostack)
+            );
+        }
+    }
+    
+    // 允许指定的IRQ中断
+    pub fn unmask_irq(&mut self, irq: u8) {
+        if irq < 8 {
+            // 主PIC的IRQ
+            self.master_mask &= !(1 << irq);
+        } else if irq < 16 {
+            // 从PIC的IRQ
+            self.slave_mask &= !(1 << (irq - 8));
+            // 确保主PIC的IRQ2（连接从PIC）是允许的
+            self.master_mask &= !(1 << 2);
+        }
+        self.apply_masks();
+    }
+    
+    // 屏蔽指定的IRQ中断
+    pub fn mask_irq(&mut self, irq: u8) {
+        if irq < 8 {
+            // 主PIC的IRQ
+            self.master_mask |= 1 << irq;
+        } else if irq < 16 {
+            // 从PIC的IRQ
+            self.slave_mask |= 1 << (irq - 8);
+        }
+        self.apply_masks();
+    }
+}
+
+// 全局PIC实例
+static mut PIC: Option<Pic> = None;
+
 // 初始化PIC
 pub fn init_pic() {
     unsafe {
-        // 初始化主PIC
-        asm!(
-            "mov al, 0x11",
-            "out 0x20, al", // 主PIC命令端口
-            "out 0xA0, al", // 从PIC命令端口
-            
-            "mov al, 0x20",
-            "out 0x21, al", // 主PIC数据端口，设置中断向量号从32开始
-            "mov al, 0x28",
-            "out 0xA1, al", // 从PIC数据端口，设置中断向量号从40开始
-            
-            "mov al, 0x04",
-            "out 0x21, al", // 主PIC设置从PIC连接到IRQ2
-            "mov al, 0x02",
-            "out 0xA1, al", // 从PIC设置连接到主PIC的IRQ2
-            
-            "mov al, 0x01",
-            "out 0x21, al", // 主PIC设置为8086模式
-            "out 0xA1, al", // 从PIC设置为8086模式
-            
-            "mov al, 0xFF",
-            "out 0x21, al", // 主PIC屏蔽所有中断
-            "out 0xA1, al", // 从PIC屏蔽所有中断
-            
-            "mov al, 0xFE",
-            "out 0x21, al", // 主PIC允许时钟中断
-            
-            options(nomem, nostack)
-        );
-        
-        crate::console::print(core::format_args!("PIC初始化成功\n"));
+        PIC = Some(Pic::default());
+        if let Some(ref mut pic) = PIC {
+            pic.init();
+        }
+    }
+}
+
+// 允许指定的IRQ中断
+pub fn unmask_irq(irq: u8) {
+    unsafe {
+        if let Some(ref mut pic) = PIC {
+            pic.unmask_irq(irq);
+        }
+    }
+}
+
+// 屏蔽指定的IRQ中断
+pub fn mask_irq(irq: u8) {
+    unsafe {
+        if let Some(ref mut pic) = PIC {
+            pic.mask_irq(irq);
+        }
     }
 }
 

@@ -1,6 +1,15 @@
+// 文件描述符结构
+#[allow(dead_code)]
+#[derive(Clone)]
+pub struct FileDescriptor {
+    pub inode: usize,
+    pub offset: usize,
+    pub flags: u32,
+}
+
 // 进程控制块
 #[allow(dead_code)]
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct ProcessControlBlock {
     // 进程ID
     pub pid: usize,
@@ -18,6 +27,10 @@ pub struct ProcessControlBlock {
     pub registers: [u64; 16], // rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15
     // 标志寄存器
     pub rflags: u64,
+    // 文件描述符表
+    pub file_descriptors: [Option<FileDescriptor>; 64],
+    // 下一个可用的文件描述符
+    pub next_fd: usize,
     // 下一个进程（用于链表）
     pub next: Option<usize>,
 }
@@ -33,33 +46,63 @@ pub enum ProcessState {
 }
 
 // 进程列表
-static mut PROCESSES: [Option<ProcessControlBlock>; 64] = [None; 64];
+static mut PROCESSES: [Option<ProcessControlBlock>; 64] = [const { None }; 64];
 // 下一个可用的PID
 static mut NEXT_PID: usize = 1;
 // 当前运行的进程PID
 static mut CURRENT_PID: Option<usize> = None;
 
+// 获取当前运行的进程PID
+pub fn get_current_pid() -> Option<usize> {
+    unsafe {
+        // 裸机环境下，单核心调度无竞态，因此可以安全访问
+        CURRENT_PID
+    }
+}
+
+// 设置当前运行的进程PID
+pub fn set_current_pid(pid: Option<usize>) {
+    unsafe {
+        // 裸机环境下，单核心调度无竞态，因此可以安全访问
+        CURRENT_PID = pid;
+    }
+}
+
 // 初始化进程管理
 pub fn init() {
     // 创建init进程（PID 1）
-    let init_pid = process_create(0, 0);
-    if let Some(pid) = init_pid {
-        unsafe {
-            CURRENT_PID = Some(pid);
-            if let Some(ref mut process) = PROCESSES[pid] {
-                process.state = ProcessState::Running;
+    match process_create(0, 0) {
+        Ok(pid) => {
+            unsafe {
+                CURRENT_PID = Some(pid);
+                if let Some(ref mut process) = PROCESSES[pid] {
+                    process.state = ProcessState::Running;
+                }
             }
+            crate::console::print(core::format_args!("初始化进程创建成功: PID {}\n", pid));
+        },
+        Err(err) => {
+            crate::console::print(core::format_args!("错误: 创建初始化进程失败: {:?}\n", err));
         }
     }
 }
 
+// 进程创建错误类型
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ProcessError {
+    OutOfPids,
+    AddressSpaceInitFailed,
+    StackAllocationFailed,
+    InternalError,
+}
+
 // 创建进程
-pub fn process_create(entry_point: u64, _stack_size: u64) -> Option<usize> {
+pub fn process_create(entry_point: u64, _stack_size: u64) -> Result<usize, ProcessError> {
     unsafe {
         // 分配PID
         let pid = NEXT_PID;
         if pid >= 64 {
-            return None;
+            return Err(ProcessError::OutOfPids);
         }
         NEXT_PID += 1;
         
@@ -67,8 +110,16 @@ pub fn process_create(entry_point: u64, _stack_size: u64) -> Option<usize> {
         let mut address_space = crate::mm::virt::AddressSpace::new();
         address_space.init();
         
+        // 检查地址空间初始化是否成功
+        if address_space.page_table_root() == 0 {
+            return Err(ProcessError::AddressSpaceInitFailed);
+        }
+        
         // 分配堆栈
-        let stack_start = crate::mm::physical::allocate_page().unwrap_or(0x800000) as u64;
+        let stack_start = match crate::mm::physical::allocate_page() {
+            Ok(addr) => addr as u64,
+            Err(_) => return Err(ProcessError::StackAllocationFailed),
+        };
         let stack_pointer = stack_start + 4096;
         
         // 创建PCB
@@ -81,11 +132,13 @@ pub fn process_create(entry_point: u64, _stack_size: u64) -> Option<usize> {
             program_counter: entry_point,
             registers: [0; 16],
             rflags: 0x202, // IF=1
+            file_descriptors: [const { None }; 64],
+            next_fd: 3, // 0,1,2 分别是stdin, stdout, stderr
             next: None,
         };
         
         PROCESSES[pid] = Some(process);
-        Some(pid)
+        Ok(pid)
     }
 }
 
@@ -96,11 +149,16 @@ pub fn process_exit(pid: usize) {
             process.state = ProcessState::Terminated;
             
             // 释放地址空间
-            // 这里简化处理，实际需要释放页表等资源
+            process.address_space.deinit();
             
             // 释放堆栈
             let stack_start = process.stack_pointer - 4096;
-            crate::mm::physical::free_page(stack_start as usize);
+            match crate::mm::physical::free_page(stack_start as usize) {
+                Ok(()) => {},
+                Err(err) => {
+                    crate::console::print(core::format_args!("警告: 释放进程堆栈失败: {:?}\n", err));
+                }
+            }
             
             // 从进程列表中移除
             PROCESSES[pid] = None;
@@ -109,6 +167,22 @@ pub fn process_exit(pid: usize) {
             if CURRENT_PID == Some(pid) {
                 crate::task::scheduler::schedule();
             }
+        }
+    }
+}
+
+// 为ProcessControlBlock实现Drop trait，确保资源自动释放
+impl Drop for ProcessControlBlock {
+    fn drop(&mut self) {
+        // 释放地址空间
+        self.address_space.deinit();
+        
+        // 释放堆栈
+        let stack_start = self.stack_pointer - 4096;
+        if let Err(err) = crate::mm::physical::free_page(stack_start as usize) {
+            // 这里不能使用print，因为drop可能在任何上下文中被调用
+            // 只记录错误，不做其他处理
+            core::panic!("释放进程堆栈失败: {:?}", err);
         }
     }
 }
