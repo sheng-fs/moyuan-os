@@ -50,4 +50,11 @@ unsafe impl GlobalAlloc for DummyAllocator {
 #[global_allocator]
 static ALLOCATOR: DummyAllocator = DummyAllocator;
 
+// panic 处理函数
+#[cfg(not(test))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+
 
