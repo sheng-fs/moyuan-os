@@ -16,7 +16,12 @@ members = [
     "services/config_service",
     "services/gui_service",
     "services/shell_service",
-    "services/container_service"
+    "services/container_service",
+    "userland/libs/libc",
+    "userland/bin/ls",
+    "userland/bin/cat",
+    "userland/bin/mkdir",
+    "userland/bin/rm"
 ]
 
 [profile.dev]

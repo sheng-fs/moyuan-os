@@ -36,7 +36,7 @@ pub fn add_to_ready_queue(pid: usize) {
 }
 
 // 从就绪队列中移除进程
-pub fn remove_from_ready_queue(pid: usize) {
+#[allow(dead_code)] pub fn remove_from_ready_queue(pid: usize) {
     if let Some(ref mut scheduler) = *SCHEDULER.lock() {
         // 查找并移除进程 ID
         if let Some(index) = scheduler.ready_queue.iter().position(|&p| p == pid) {

@@ -6,7 +6,12 @@ edition = "2021"
 [lib]
 path = "src/lib.rs"
 
+[[bin]]
+name = "shell"
+path = "src/main.rs"
+
 [dependencies]
+moyuan_libc = { path = "../../userland/libs/libc" }
 
 [profile.dev]
 debug = true

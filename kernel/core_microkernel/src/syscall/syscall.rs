@@ -47,6 +47,7 @@ pub fn init_fs() {
 
 // 系统调用错误枚举
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum SyscallError {
     InvalidSyscall,
     PermissionDenied,

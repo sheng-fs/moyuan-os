@@ -384,8 +384,11 @@ extern "C" fn keyboard_init() {
 }
 
 #[no_mangle]
-extern "C" fn keyboard_read_key() -> Option<char> {
-    read_key()
+extern "C" fn keyboard_read_key() -> u32 {
+    match read_key() {
+        Some(c) => c as u32,
+        None => 0
+    }
 }
 
 #[no_mangle]

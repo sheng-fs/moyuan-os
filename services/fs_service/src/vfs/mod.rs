@@ -25,7 +25,8 @@ impl Default for Permissions {
 
 /// 目录项类型
 #[derive(Debug, Clone)]
-enum DentryType {
+#[allow(dead_code)]
+pub enum DentryType {
     File,
     Directory,
 }
@@ -36,6 +37,7 @@ pub struct Dentry {
     name: String,
     inode: usize,
     dent_type: DentryType,
+    #[allow(dead_code)]
     parent: Option<usize>,
     children: Vec<usize>,
 }
@@ -133,6 +135,7 @@ pub trait FileSystem: Debug + Send + Sync {
 pub struct VFS {
     filesystems: Vec<Box<dyn FileSystem>>,
     mounted_fs: Vec<(String, usize)>, // (挂载点, 文件系统索引)
+    #[allow(dead_code)]
     dentries: Vec<Dentry>,
 }
 

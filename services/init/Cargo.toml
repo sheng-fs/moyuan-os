@@ -6,7 +6,14 @@ edition = "2021"
 [lib]
 path = "src/lib.rs"
 
+[[bin]]
+name = "init"
+path = "src/main.rs"
+
 [dependencies]
+moyuan-fs-service = { path = "../fs_service" }
+moyuan-device-service = { path = "../device_service" }
+moyuan_libc = { path = "../../userland/libs/libc" }
 
 [profile.dev]
 debug = true

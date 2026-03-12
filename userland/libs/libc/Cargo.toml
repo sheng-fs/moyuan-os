@@ -1,0 +1,13 @@
+[package]
+name = "moyuan_libc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[lib]
+name = "c"
+path = "src/lib.rs"
+
+[target.'cfg(target_os = "none")']
+panic = "abort"

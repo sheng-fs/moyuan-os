@@ -1,0 +1,14 @@
+[package]
+name = "ls"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+moyuan_libc = { path = "../../libs/libc" }
+
+[[bin]]
+name = "ls"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "none")']
+panic = "abort"

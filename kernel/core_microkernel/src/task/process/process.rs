@@ -61,6 +61,7 @@ pub fn get_current_pid() -> Option<usize> {
 }
 
 // 设置当前运行的进程PID
+#[allow(dead_code)]
 pub fn set_current_pid(pid: Option<usize>) {
     unsafe {
         // 裸机环境下，单核心调度无竞态，因此可以安全访问
@@ -89,6 +90,7 @@ pub fn init() {
 
 // 进程创建错误类型
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum ProcessError {
     OutOfPids,
     AddressSpaceInitFailed,

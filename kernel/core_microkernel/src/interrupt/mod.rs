@@ -342,6 +342,7 @@ impl Pic {
     }
     
     // 允许指定的IRQ中断
+    #[allow(dead_code)]
     pub fn unmask_irq(&mut self, irq: u8) {
         if irq < 8 {
             // 主PIC的IRQ
@@ -356,6 +357,7 @@ impl Pic {
     }
     
     // 屏蔽指定的IRQ中断
+    #[allow(dead_code)]
     pub fn mask_irq(&mut self, irq: u8) {
         if irq < 8 {
             // 主PIC的IRQ
@@ -382,6 +384,7 @@ pub fn init_pic() {
 }
 
 // 允许指定的IRQ中断
+#[allow(dead_code)]
 pub fn unmask_irq(irq: u8) {
     unsafe {
         if let Some(ref mut pic) = PIC {
@@ -391,6 +394,7 @@ pub fn unmask_irq(irq: u8) {
 }
 
 // 屏蔽指定的IRQ中断
+#[allow(dead_code)]
 pub fn mask_irq(irq: u8) {
     unsafe {
         if let Some(ref mut pic) = PIC {

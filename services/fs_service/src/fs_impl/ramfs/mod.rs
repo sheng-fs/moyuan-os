@@ -104,6 +104,7 @@ impl Inode for RamfsInode {
 
 /// Ramfs文件系统实现
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Ramfs {
     inodes: BTreeMap<usize, RamfsInode>,
     next_inode: usize,
