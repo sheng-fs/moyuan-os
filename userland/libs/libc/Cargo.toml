@@ -1,6 +1,6 @@
 [package]
-name = "moyuan_libc"
-version = "0.1.0"
+name = "moyuan-libc"
+version = "0.1.0-alpha.1"
 edition = "2021"
 
 [dependencies]
