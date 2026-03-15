@@ -45,31 +45,63 @@ pub mod vga {
     use super::DisplayMode;
     
     pub fn init() {
-        // 实际实现将在集成时提供
+        // 调用内核的VGA初始化函数
+        unsafe {
+            extern "C" { fn vga_init(); }
+            vga_init();
+        }
     }
     
-    pub fn set_mode(_mode: DisplayMode) {
-        // 实际实现将在集成时提供
+    pub fn set_mode(mode: DisplayMode) {
+        // 调用内核的VGA设置模式函数
+        unsafe {
+            extern "C" { fn vga_set_mode(mode: u8); }
+            let mode_code = match mode {
+                DisplayMode::Text => 0,
+                DisplayMode::Graphics => 1,
+            };
+            vga_set_mode(mode_code);
+        }
     }
     
-    pub fn print_char(_c: char, _x: usize, _y: usize, _fg_color: u8, _bg_color: u8) {
-        // 实际实现将在集成时提供
+    pub fn print_char(c: char, x: usize, y: usize, fg_color: u8, bg_color: u8) {
+        // 调用内核的VGA打印字符函数
+        unsafe {
+            extern "C" { fn vga_print_char(c: u8, x: usize, y: usize, fg_color: u8, bg_color: u8); }
+            vga_print_char(c as u8, x, y, fg_color, bg_color);
+        }
     }
     
     pub fn clear_screen() {
-        // 实际实现将在集成时提供
+        // 调用内核的VGA清屏函数
+        unsafe {
+            extern "C" { fn vga_clear_screen(); }
+            vga_clear_screen();
+        }
     }
     
-    pub fn put_char(_c: char) {
-        // 实际实现将在集成时提供
+    pub fn put_char(c: char) {
+        // 调用内核的VGA显示字符函数
+        unsafe {
+            extern "C" { fn vga_put_char(c: u8); }
+            vga_put_char(c as u8);
+        }
     }
     
-    pub fn set_cursor_pos(_x: usize, _y: usize) {
-        // 实际实现将在集成时提供
+    pub fn set_cursor_pos(x: usize, y: usize) {
+        // 调用内核的VGA设置光标位置函数
+        unsafe {
+            extern "C" { fn vga_set_cursor_pos(x: usize, y: usize); }
+            vga_set_cursor_pos(x, y);
+        }
     }
     
-    pub fn set_framebuffer(_addr: u64, _width: usize, _height: usize, _pitch: usize, _bpp: usize) {
-        // 实际实现将在集成时提供
+    pub fn set_framebuffer(addr: u64, width: usize, height: usize, pitch: usize, bpp: usize) {
+        // 调用内核的VGA设置帧缓冲区函数
+        unsafe {
+            extern "C" { fn vga_set_framebuffer(addr: u64, width: usize, height: usize, pitch: usize, bpp: usize); }
+            vga_set_framebuffer(addr, width, height, pitch, bpp);
+        }
     }
 }
 

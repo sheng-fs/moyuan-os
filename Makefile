@@ -54,7 +54,7 @@ uefi_bootloader:
 	@mkdir -p $(OUTPUT_DIR)
 	@echo "构建UEFI引导加载器..."
 	@cd bootloader/uefi && $(CARGO) build --target x86_64-unknown-uefi --release
-	@cp bootloader/uefi/target/x86_64-unknown-uefi/release/bootloader.efi $(UEFI_BOOTLOADER)
+	@cp target/x86_64-unknown-uefi/release/moyuan-uefi-bootloader.efi $(UEFI_BOOTLOADER)
 
 # 清理构建产物
 clean:

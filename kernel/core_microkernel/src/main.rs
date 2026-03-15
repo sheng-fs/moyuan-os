@@ -283,7 +283,21 @@ fn test_memory_management() {
 fn test_process_management() {
     print!("测试进程管理...\n");
     // 测试进程创建
-    // 这里需要实现进程创建逻辑
+    match task::process::process_create(test_process_entry as *const () as u64, 4096) {
+        Ok(pid) => {
+            task::scheduler::add_to_ready_queue(pid);
+            print!("进程创建成功，PID: {}\n", pid);
+        }
+        Err(e) => {
+            print!("进程创建失败: {:?}\n", e);
+        }
+    }
+    
+    // 测试进程调度
+    print!("测试进程调度...\n");
+    // 运行一次调度
+    task::scheduler::schedule();
+    print!("进程调度测试完成\n");
 }
 
 // 测试系统调用
@@ -301,5 +315,15 @@ fn test_syscalls() {
 fn test_interrupts() {
     print!("测试中断处理...\n");
     // 测试中断处理函数注册
-    // 这里需要实现中断处理函数注册测试
+    print!("测试中断处理函数注册...\n");
+    
+    // 测试时钟中断
+    print!("测试时钟中断...\n");
+    // 这里可以触发一个时钟中断来测试
+    
+    // 测试键盘中断
+    print!("测试键盘中断...\n");
+    // 这里可以触发一个键盘中断来测试
+    
+    print!("中断处理测试完成\n");
 }

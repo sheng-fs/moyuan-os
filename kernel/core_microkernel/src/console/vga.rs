@@ -42,6 +42,12 @@ pub fn init() {
     }
 }
 
+/// 初始化VGA（C接口）
+#[no_mangle]
+extern "C" fn vga_init() {
+    init();
+}
+
 /// 显示系统LOGO（像素化）
 pub fn display_logo() {
     // 像素化的系统LOGO
@@ -103,12 +109,28 @@ pub fn set_framebuffer(addr: u64, width: usize, height: usize, pitch: usize, bpp
     }
 }
 
+/// 设置帧缓冲区信息（C接口）
+#[no_mangle]
+extern "C" fn vga_set_framebuffer(addr: u64, width: usize, height: usize, pitch: usize, bpp: usize) {
+    set_framebuffer(addr, width, height, pitch, bpp);
+}
+
 /// 设置显示模式
 #[allow(dead_code)]
 pub fn set_mode(mode: DisplayMode) {
     unsafe {
         CURRENT_MODE = mode;
     }
+}
+
+/// 设置显示模式（C接口）
+#[no_mangle]
+extern "C" fn vga_set_mode(mode: u8) {
+    let display_mode = match mode {
+        0 => DisplayMode::Text,
+        _ => DisplayMode::Graphics,
+    };
+    set_mode(display_mode);
 }
 
 /// 清空屏幕
@@ -135,6 +157,12 @@ pub fn clear_screen() {
             }
         }
     }
+}
+
+/// 清空屏幕（C接口）
+#[no_mangle]
+extern "C" fn vga_clear_screen() {
+    clear_screen();
 }
 
 /// 滚动屏幕
@@ -168,6 +196,12 @@ pub fn set_cursor_pos(x: usize, y: usize) {
             ROW = y;
         }
     }
+}
+
+/// 设置光标位置（C接口）
+#[no_mangle]
+extern "C" fn vga_set_cursor_pos(x: usize, y: usize) {
+    set_cursor_pos(x, y);
 }
 
 /// 打印一个字符
@@ -207,6 +241,12 @@ pub fn put_char(c: char) {
     }
 }
 
+/// 打印一个字符（C接口）
+#[no_mangle]
+extern "C" fn vga_put_char(c: u8) {
+    put_char(c as char);
+}
+
 /// 在指定位置显示字符
 #[allow(dead_code)]
 pub fn print_char(c: char, x: usize, y: usize, fg_color: u8, bg_color: u8) {
@@ -217,6 +257,12 @@ pub fn print_char(c: char, x: usize, y: usize, fg_color: u8, bg_color: u8) {
             *VGA_BUFFER.offset(index as isize) = c as u16 | (color as u16) << 8;
         }
     }
+}
+
+/// 在指定位置显示字符（C接口）
+#[no_mangle]
+extern "C" fn vga_print_char(c: u8, x: usize, y: usize, fg_color: u8, bg_color: u8) {
+    print_char(c as char, x, y, fg_color, bg_color);
 }
 
 /// 打印格式化字符串到VGA
