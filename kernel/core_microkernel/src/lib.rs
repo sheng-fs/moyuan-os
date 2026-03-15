@@ -61,7 +61,10 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 pub mod console;
 pub mod interrupt;
+pub mod ipc;
 pub mod mm;
+pub mod power;
+pub mod security;
 pub mod syscall;
 pub mod task;
 
@@ -84,4 +87,10 @@ pub fn init() {
     
     // 初始化系统调用
     syscall::init();
+    
+    // 初始化安全系统
+    security::init();
+    
+    // 初始化电源管理
+    power::init();
 }

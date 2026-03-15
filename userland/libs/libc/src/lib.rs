@@ -98,7 +98,7 @@ pub unsafe fn syscall3(number: usize, arg1: usize, arg2: usize, arg3: usize) -> 
 pub extern "C" fn exit(status: i32) -> ! {
     unsafe {
         syscall1(SYS_EXIT, status as usize);
-        loop {}
+        panic!("syscall exit failed");
     }
 }
 
@@ -152,70 +152,60 @@ pub extern "C" fn brk(addr: *mut u8) -> *mut u8 {
 
 // 字符串函数
 #[no_mangle]
-pub extern "C" fn strlen(s: *const u8) -> usize {
-    unsafe {
-        let mut len = 0;
-        while *s.offset(len as isize) != 0 {
-            len += 1;
+pub unsafe extern "C" fn strlen(s: *const u8) -> usize {
+    let mut len = 0;
+    while *s.add(len) != 0 {
+        len += 1;
+    }
+    len
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strcmp(s1: *const u8, s2: *const u8) -> i32 {
+    let mut i = 0;
+    loop {
+        let a = *s1.add(i);
+        let b = *s2.add(i);
+        if a != b {
+            return (a as i32) - (b as i32);
         }
-        len
+        if a == 0 {
+            return 0;
+        }
+        i += 1;
     }
 }
 
 #[no_mangle]
-pub extern "C" fn strcmp(s1: *const u8, s2: *const u8) -> i32 {
-    unsafe {
-        let mut i = 0;
-        loop {
-            let a = *s1.offset(i);
-            let b = *s2.offset(i);
-            if a != b {
-                return (a as i32) - (b as i32);
-            }
-            if a == 0 {
-                return 0;
-            }
-            i += 1;
+pub unsafe extern "C" fn strcpy(dest: *mut u8, src: *const u8) -> *mut u8 {
+    let mut i = 0;
+    loop {
+        let c = *src.add(i);
+        *dest.add(i) = c;
+        if c == 0 {
+            break;
         }
+        i += 1;
     }
-}
-
-#[no_mangle]
-pub extern "C" fn strcpy(dest: *mut u8, src: *const u8) -> *mut u8 {
-    unsafe {
-        let mut i = 0;
-        loop {
-            let c = *src.offset(i);
-            *dest.offset(i) = c;
-            if c == 0 {
-                break;
-            }
-            i += 1;
-        }
-        dest
-    }
+    dest
 }
 
 // 内存函数
 #[no_mangle]
-pub extern "C" fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8 {
-    unsafe {
-        core::ptr::copy(src, dest, n);
-        dest
-    }
+pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8 {
+    core::ptr::copy(src, dest, n);
+    dest
 }
 
 #[no_mangle]
-pub extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
-    unsafe {
-        core::ptr::write_bytes(s, c as u8, n);
-        s
-    }
+pub unsafe extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
+    core::ptr::write_bytes(s, c as u8, n);
+    s
 }
 
 // 标准输入输出函数
 #[no_mangle]
-pub extern "C" fn puts(s: *const u8) -> i32 {
+pub unsafe extern "C" fn puts(s: *const u8) -> i32 {
     let len = strlen(s);
     let mut buf = [0u8; 1024];
     strcpy(buf.as_mut_ptr(), s);
@@ -226,23 +216,23 @@ pub extern "C" fn puts(s: *const u8) -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn printf(format: *const u8, _: ...) -> i32 {
     // 简化实现，仅支持 %s 和 %d
-    let mut args = core::ptr::addr_of!(format).offset(1) as *const usize;
+    let mut args = core::ptr::addr_of!(format).add(1) as *const usize;
     let mut fmt = format;
     let mut buf = [0u8; 1024];
     let mut pos = 0;
     
     while *fmt != 0 {
         if *fmt == b'%' {
-            fmt = fmt.offset(1);
+            fmt = fmt.add(1);
             match *fmt {
                 b's' => {
                     let s = *args as *const u8;
                     let len = strlen(s);
                     if pos + len < buf.len() {
-                        memcpy(buf.as_mut_ptr().offset(pos as isize), s, len);
+                        memcpy(buf.as_mut_ptr().add(pos), s, len);
                         pos += len;
                     }
-                    args = args.offset(1);
+                    args = args.add(1);
                 }
                 b'd' => {
                     let num = *args as i32;
@@ -266,16 +256,16 @@ pub unsafe extern "C" fn printf(format: *const u8, _: ...) -> i32 {
                     } else {
                         temp = n;
                         for i in (0..digits).rev() {
-                            num_str[num_pos + i] = ((temp % 10) as u8 + b'0') as u8;
+                            num_str[num_pos + i] = (temp % 10) as u8 + b'0';
                             temp /= 10;
                         }
                         num_pos += digits;
                     }
                     if pos + num_pos < buf.len() {
-                        memcpy(buf.as_mut_ptr().offset(pos as isize), num_str.as_ptr(), num_pos);
+                        memcpy(buf.as_mut_ptr().add(pos), num_str.as_ptr(), num_pos);
                         pos += num_pos;
                     }
-                    args = args.offset(1);
+                    args = args.add(1);
                 }
                 _ => {}
             }
@@ -283,7 +273,7 @@ pub unsafe extern "C" fn printf(format: *const u8, _: ...) -> i32 {
             buf[pos] = *fmt;
             pos += 1;
         }
-        fmt = fmt.offset(1);
+        fmt = fmt.add(1);
     }
     write(STDOUT_FILENO, buf.as_ptr(), pos) as i32
 }

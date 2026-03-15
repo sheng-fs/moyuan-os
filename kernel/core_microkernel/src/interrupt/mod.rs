@@ -250,7 +250,7 @@ extern "C" fn timer_interrupt_handler() -> ! {
     unsafe {
         let current_count = TIMER_COUNT;
         TIMER_COUNT += 1;
-        if current_count % 100 == 0 { // 每100个时钟中断（约1秒）打印一次
+        if current_count.is_multiple_of(100) { // 每100个时钟中断（约1秒）打印一次
             crate::console::print(core::format_args!("时钟中断: {}\n", current_count));
         }
         

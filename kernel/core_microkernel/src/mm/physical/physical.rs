@@ -53,8 +53,8 @@ pub unsafe fn init(boot_info: *mut BootInfo) {
         console::print(core::format_args!("物理内存总量: {} MB\n", total_memory / (1024 * 1024)));
         
         // 计算需要的位图大小
-        let total_frames = (max_physical_address as usize + PAGE_SIZE - 1) / PAGE_SIZE;
-        let bitmap_size = (total_frames + 7) / 8;
+        let total_frames = (max_physical_address as usize).div_ceil(PAGE_SIZE);
+        let bitmap_size = total_frames.div_ceil(8);
         
         // 寻找可用的内存区域来存储位图
         let mut bitmap_address = 0;
@@ -107,7 +107,7 @@ pub unsafe fn init(boot_info: *mut BootInfo) {
         let kernel_size = (*boot_info).kernel_size;
         let kernel_end = kernel_start + kernel_size;
         let start_frame = (kernel_start / PAGE_SIZE as u64) as usize;
-        let end_frame = ((kernel_end + PAGE_SIZE as u64 - 1) / PAGE_SIZE as u64) as usize;
+        let end_frame = kernel_end.div_ceil(PAGE_SIZE as u64) as usize;
         
         for frame in start_frame..end_frame {
             if frame < total_frames {
@@ -122,7 +122,7 @@ pub unsafe fn init(boot_info: *mut BootInfo) {
         // 标记位图本身占用的内存
         let bitmap_end = bitmap_address + bitmap_size as u64;
         let bitmap_start_frame = (bitmap_address / PAGE_SIZE as u64) as usize;
-        let bitmap_end_frame = ((bitmap_end + PAGE_SIZE as u64 - 1) / PAGE_SIZE as u64) as usize;
+        let bitmap_end_frame = bitmap_end.div_ceil(PAGE_SIZE as u64) as usize;
         
         for frame in bitmap_start_frame..bitmap_end_frame {
             if frame < total_frames {
@@ -298,7 +298,7 @@ pub fn free_page(physical_address: usize) -> Result<(), AllocError> {
     unsafe {
         if let Some(ref mut manager) = PHYSICAL_MEMORY_MANAGER {
             // 检查物理地址是否页对齐
-            if physical_address % PAGE_SIZE != 0 {
+            if !physical_address.is_multiple_of(PAGE_SIZE) {
                 return Err(AllocError::InvalidAddress); // 物理地址不是页对齐的
             }
             

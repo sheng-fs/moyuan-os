@@ -31,6 +31,14 @@ pub struct ProcessControlBlock {
     pub file_descriptors: [Option<FileDescriptor>; 64],
     // 下一个可用的文件描述符
     pub next_fd: usize,
+    // 用户ID
+    pub uid: usize,
+    // 组ID
+    pub gid: usize,
+    // 有效用户ID
+    pub euid: usize,
+    // 有效组ID
+    pub egid: usize,
     // 下一个进程（用于链表）
     pub next: Option<usize>,
 }
@@ -124,6 +132,13 @@ pub fn process_create(entry_point: u64, _stack_size: u64) -> Result<usize, Proce
         };
         let stack_pointer = stack_start + 4096;
         
+        // 初始化用户ID和组ID
+        // 默认使用root权限
+        let uid = 0;
+        let gid = 0;
+        let euid = 0;
+        let egid = 0;
+        
         // 创建PCB
         let process = ProcessControlBlock {
             pid,
@@ -136,6 +151,10 @@ pub fn process_create(entry_point: u64, _stack_size: u64) -> Result<usize, Proce
             rflags: 0x202, // IF=1
             file_descriptors: [const { None }; 64],
             next_fd: 3, // 0,1,2 分别是stdin, stdout, stderr
+            uid,
+            gid,
+            euid,
+            egid,
             next: None,
         };
         

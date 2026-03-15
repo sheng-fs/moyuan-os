@@ -1,5 +1,10 @@
 extern crate alloc;
 
+// 导入IPC模块
+
+
+use crate::power;
+
 // 系统调用枚举
 #[derive(Debug, Clone, Copy)]
 pub enum Syscall {
@@ -15,6 +20,32 @@ pub enum Syscall {
     Mmap = 9,
     Munmap = 10,
     Unlink = 11,
+    // IPC系统调用
+    Pipe = 12,           // 创建匿名管道
+    ShmCreate = 13,      // 创建共享内存
+    ShmOpen = 14,        // 打开共享内存
+    ShmMap = 15,         // 映射共享内存
+    ShmUnmap = 16,       // 解除共享内存映射
+    ShmClose = 17,       // 关闭共享内存
+    SemCreate = 18,      // 创建信号量
+    SemOpen = 19,        // 打开信号量
+    SemP = 20,           // 信号量P操作
+    SemV = 21,           // 信号量V操作
+    SemClose = 22,       // 关闭信号量
+    // 安全相关系统调用
+    GetUid = 23,         // 获取当前进程的UID
+    GetGid = 24,         // 获取当前进程的GID
+    SetUid = 25,         // 设置当前进程的UID
+    SetGid = 26,         // 设置当前进程的GID
+    GetEuid = 27,        // 获取当前进程的有效UID
+    GetEgid = 28,        // 获取当前进程的有效GID
+    SetEuid = 29,        // 设置当前进程的有效UID
+    SetEgid = 30,        // 设置当前进程的有效GID
+    
+    // 电源管理相关系统调用
+    PowerManagement = 31,    // 电源管理
+    CpuFrequency = 32,       // CPU频率调节
+    DevicePowerManagement = 33, // 设备电源管理
 }
 
 // 全局文件系统服务
@@ -62,7 +93,7 @@ pub enum SyscallError {
 type SyscallHandler = fn(&[usize]) -> Result<usize, SyscallError>;
 
 // 系统调用表
-static mut SYSCALL_TABLE: [Option<SyscallHandler>; 12] = [
+static mut SYSCALL_TABLE: [Option<SyscallHandler>; 34] = [
     Some(sys_exit),        // 0
     Some(sys_fork),        // 1
     Some(sys_exec),        // 2
@@ -75,6 +106,31 @@ static mut SYSCALL_TABLE: [Option<SyscallHandler>; 12] = [
     Some(sys_mmap),        // 9
     Some(sys_munmap),      // 10
     Some(sys_unlink),      // 11
+    // IPC系统调用
+    Some(sys_pipe),        // 12
+    Some(sys_shm_create),  // 13
+    Some(sys_shm_open),    // 14
+    Some(sys_shm_map),     // 15
+    Some(sys_shm_unmap),   // 16
+    Some(sys_shm_close),   // 17
+    Some(sys_sem_create),  // 18
+    Some(sys_sem_open),    // 19
+    Some(sys_sem_p),       // 20
+    Some(sys_sem_v),       // 21
+    Some(sys_sem_close),   // 22
+    // 安全相关系统调用
+    Some(sys_getuid),      // 23
+    Some(sys_getgid),      // 24
+    Some(sys_setuid),      // 25
+    Some(sys_setgid),      // 26
+    Some(sys_geteuid),     // 27
+    Some(sys_getegid),     // 28
+    Some(sys_seteuid),     // 29
+    Some(sys_setegid),     // 30
+    // 电源管理相关系统调用
+    Some(sys_power_management),  // 31
+    Some(sys_cpu_frequency),     // 32
+    Some(sys_device_power_management), // 33
 ];
 
 // 系统调用处理函数
@@ -111,6 +167,31 @@ impl TryFrom<usize> for Syscall {
             9 => Ok(Syscall::Mmap),
             10 => Ok(Syscall::Munmap),
             11 => Ok(Syscall::Unlink),
+            // IPC系统调用
+            12 => Ok(Syscall::Pipe),
+            13 => Ok(Syscall::ShmCreate),
+            14 => Ok(Syscall::ShmOpen),
+            15 => Ok(Syscall::ShmMap),
+            16 => Ok(Syscall::ShmUnmap),
+            17 => Ok(Syscall::ShmClose),
+            18 => Ok(Syscall::SemCreate),
+            19 => Ok(Syscall::SemOpen),
+            20 => Ok(Syscall::SemP),
+            21 => Ok(Syscall::SemV),
+            22 => Ok(Syscall::SemClose),
+            // 安全相关系统调用
+            23 => Ok(Syscall::GetUid),
+            24 => Ok(Syscall::GetGid),
+            25 => Ok(Syscall::SetUid),
+            26 => Ok(Syscall::SetGid),
+            27 => Ok(Syscall::GetEuid),
+            28 => Ok(Syscall::GetEgid),
+            29 => Ok(Syscall::SetEuid),
+            30 => Ok(Syscall::SetEgid),
+            // 电源管理相关系统调用
+            31 => Ok(Syscall::PowerManagement),
+            32 => Ok(Syscall::CpuFrequency),
+            33 => Ok(Syscall::DevicePowerManagement),
             _ => Err(()),
         }
     }
@@ -286,7 +367,7 @@ fn sys_close(args: &[usize]) -> Result<usize, SyscallError> {
     
     // 检查文件描述符
     let current_process = crate::task::process::get_current_process().ok_or(SyscallError::InvalidArgument)?;
-    if fd < 3 || fd >= 64 {
+    if !(3..64).contains(&fd) {
         return Err(SyscallError::InvalidArgument);
     }
     
@@ -342,4 +423,325 @@ fn sys_mmap(_args: &[usize]) -> Result<usize, SyscallError> {
 fn sys_munmap(_args: &[usize]) -> Result<usize, SyscallError> {
     // 这里实现解除内存映射系统调用
     Err(SyscallError::NotSupported)
+}
+
+// 创建匿名管道系统调用
+fn sys_pipe(args: &[usize]) -> Result<usize, SyscallError> {
+    let pipefd = args[0]; // 指向两个文件描述符的数组
+    
+    match crate::ipc::pipe::create_anonymous_pipe() {
+        Ok((read_fd, write_fd)) => {
+            // 将文件描述符写入用户空间
+            unsafe {
+                let pipefd_ptr = pipefd as *mut [usize; 2];
+                (*pipefd_ptr)[0] = read_fd;
+                (*pipefd_ptr)[1] = write_fd;
+            }
+            Ok(0)
+        },
+        Err(_) => Err(SyscallError::ResourceBusy),
+    }
+}
+
+// 创建共享内存系统调用
+fn sys_shm_create(args: &[usize]) -> Result<usize, SyscallError> {
+    let size = args[0];
+    let name_ptr = args[1];
+    
+    let name = if name_ptr != 0 {
+        unsafe {
+            let mut name_str = alloc::string::String::new();
+            let mut ptr = name_ptr as *const u8;
+            while *ptr != 0 {
+                name_str.push(*ptr as char);
+                ptr = ptr.add(1);
+            }
+            Some(name_str)
+        }
+    } else {
+        None
+    };
+    
+    match crate::ipc::shared_memory::create_shared_memory(size, name.as_deref()) {
+        Ok(shm_id) => Ok(shm_id),
+        Err(_) => Err(SyscallError::ResourceBusy),
+    }
+}
+
+// 打开共享内存系统调用
+fn sys_shm_open(args: &[usize]) -> Result<usize, SyscallError> {
+    let name_ptr = args[0];
+    
+    let name = unsafe {
+        let mut name = alloc::string::String::new();
+        let mut ptr = name_ptr as *const u8;
+        while *ptr != 0 {
+            name.push(*ptr as char);
+            ptr = ptr.add(1);
+        }
+        name
+    };
+    
+    match crate::ipc::shared_memory::open_shared_memory(&name) {
+        Ok(shm_id) => Ok(shm_id),
+        Err(_) => Err(SyscallError::NotFound),
+    }
+}
+
+// 映射共享内存系统调用
+fn sys_shm_map(args: &[usize]) -> Result<usize, SyscallError> {
+    let shm_id = args[0];
+    
+    // 获取当前进程PID
+    let current_pid = crate::task::process::get_current_pid().ok_or(SyscallError::InvalidArgument)?;
+    
+    match crate::ipc::shared_memory::map_shared_memory(shm_id, current_pid) {
+        Ok(virtual_address) => Ok(virtual_address),
+        Err(_) => Err(SyscallError::ResourceBusy),
+    }
+}
+
+// 解除共享内存映射系统调用
+fn sys_shm_unmap(args: &[usize]) -> Result<usize, SyscallError> {
+    let shm_id = args[0];
+    let virtual_address = args[1];
+    
+    // 获取当前进程PID
+    let current_pid = crate::task::process::get_current_pid().ok_or(SyscallError::InvalidArgument)?;
+    
+    match crate::ipc::shared_memory::unmap_shared_memory(shm_id, current_pid, virtual_address) {
+        Ok(()) => Ok(0),
+        Err(_) => Err(SyscallError::InvalidArgument),
+    }
+}
+
+// 关闭共享内存系统调用
+fn sys_shm_close(args: &[usize]) -> Result<usize, SyscallError> {
+    let shm_id = args[0];
+    
+    match crate::ipc::shared_memory::close_shared_memory(shm_id) {
+        Ok(()) => Ok(0),
+        Err(_) => Err(SyscallError::InvalidArgument),
+    }
+}
+
+// 创建信号量系统调用
+fn sys_sem_create(args: &[usize]) -> Result<usize, SyscallError> {
+    let value = args[0] as isize;
+    let name_ptr = args[1];
+    
+    let name = if name_ptr != 0 {
+        unsafe {
+            let mut name_str = alloc::string::String::new();
+            let mut ptr = name_ptr as *const u8;
+            while *ptr != 0 {
+                name_str.push(*ptr as char);
+                ptr = ptr.add(1);
+            }
+            Some(name_str)
+        }
+    } else {
+        None
+    };
+    
+    match crate::ipc::semaphore::create_semaphore(value, name.as_deref()) {
+        Ok(sem_id) => Ok(sem_id),
+        Err(_) => Err(SyscallError::ResourceBusy),
+    }
+}
+
+// 打开信号量系统调用
+fn sys_sem_open(args: &[usize]) -> Result<usize, SyscallError> {
+    let name_ptr = args[0];
+    
+    let name = unsafe {
+        let mut name = alloc::string::String::new();
+        let mut ptr = name_ptr as *const u8;
+        while *ptr != 0 {
+            name.push(*ptr as char);
+            ptr = ptr.add(1);
+        }
+        name
+    };
+    
+    match crate::ipc::semaphore::open_semaphore(&name) {
+        Ok(sem_id) => Ok(sem_id),
+        Err(_) => Err(SyscallError::NotFound),
+    }
+}
+
+// 信号量P操作系统调用
+fn sys_sem_p(args: &[usize]) -> Result<usize, SyscallError> {
+    let sem_id = args[0];
+    
+    match crate::ipc::semaphore::semaphore_p(sem_id) {
+        Ok(()) => Ok(0),
+        Err(_) => Err(SyscallError::InvalidArgument),
+    }
+}
+
+// 信号量V操作系统调用
+fn sys_sem_v(args: &[usize]) -> Result<usize, SyscallError> {
+    let sem_id = args[0];
+    
+    match crate::ipc::semaphore::semaphore_v(sem_id) {
+        Ok(()) => Ok(0),
+        Err(_) => Err(SyscallError::InvalidArgument),
+    }
+}
+
+// 关闭信号量系统调用
+fn sys_sem_close(args: &[usize]) -> Result<usize, SyscallError> {
+    let sem_id = args[0];
+    
+    match crate::ipc::semaphore::close_semaphore(sem_id) {
+        Ok(()) => Ok(0),
+        Err(_) => Err(SyscallError::InvalidArgument),
+    }
+}
+
+// 获取当前进程的UID系统调用
+fn sys_getuid(_args: &[usize]) -> Result<usize, SyscallError> {
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        Ok(current_process.uid)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 获取当前进程的GID系统调用
+fn sys_getgid(_args: &[usize]) -> Result<usize, SyscallError> {
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        Ok(current_process.gid)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 设置当前进程的UID系统调用
+fn sys_setuid(args: &[usize]) -> Result<usize, SyscallError> {
+    let uid = args[0];
+    
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        // 只有root用户可以设置UID
+        if current_process.uid != 0 {
+            return Err(SyscallError::PermissionDenied);
+        }
+        
+        current_process.uid = uid;
+        current_process.euid = uid;
+        Ok(0)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 设置当前进程的GID系统调用
+fn sys_setgid(args: &[usize]) -> Result<usize, SyscallError> {
+    let gid = args[0];
+    
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        // 只有root用户可以设置GID
+        if current_process.uid != 0 {
+            return Err(SyscallError::PermissionDenied);
+        }
+        
+        current_process.gid = gid;
+        current_process.egid = gid;
+        Ok(0)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 获取当前进程的有效UID系统调用
+fn sys_geteuid(_args: &[usize]) -> Result<usize, SyscallError> {
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        Ok(current_process.euid)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 获取当前进程的有效GID系统调用
+fn sys_getegid(_args: &[usize]) -> Result<usize, SyscallError> {
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        Ok(current_process.egid)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 设置当前进程的有效UID系统调用
+fn sys_seteuid(args: &[usize]) -> Result<usize, SyscallError> {
+    let euid = args[0];
+    
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        // 只有root用户或进程本身可以设置有效UID
+        if current_process.uid != 0 && current_process.uid != euid {
+            return Err(SyscallError::PermissionDenied);
+        }
+        
+        current_process.euid = euid;
+        Ok(0)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 设置当前进程的有效GID系统调用
+fn sys_setegid(args: &[usize]) -> Result<usize, SyscallError> {
+    let egid = args[0];
+    
+    if let Some(current_process) = crate::task::process::get_current_process() {
+        // 只有root用户或进程本身所属组可以设置有效GID
+        if current_process.uid != 0 && !crate::security::user_group::is_user_in_group(current_process.uid as u32, egid as u32) {
+            return Err(SyscallError::PermissionDenied);
+        }
+        
+        current_process.egid = egid;
+        Ok(0)
+    } else {
+        Err(SyscallError::InvalidArgument)
+    }
+}
+
+// 电源管理系统调用
+fn sys_power_management(args: &[usize]) -> Result<usize, SyscallError> {
+    let cmd = args[0];
+    let arg1 = args[1];
+    
+    let result = power::syscall_power_management(cmd as u64, arg1 as u64, 0, 0, 0, 0, 0);
+    if result < 0 {
+        Err(SyscallError::NotSupported)
+    } else {
+        Ok(result as usize)
+    }
+}
+
+// CPU频率调节系统调用
+fn sys_cpu_frequency(args: &[usize]) -> Result<usize, SyscallError> {
+    let cmd = args[0];
+    let arg1 = args[1];
+    
+    let result = power::cpu::syscall_cpu_frequency(cmd as u64, arg1 as u64, 0, 0, 0, 0, 0);
+    if result < 0 {
+        Err(SyscallError::NotSupported)
+    } else {
+        Ok(result as usize)
+    }
+}
+
+// 设备电源管理系统调用
+fn sys_device_power_management(args: &[usize]) -> Result<usize, SyscallError> {
+    let cmd = args[0];
+    let arg1 = args[1];
+    let arg2 = args[2];
+    
+    let result = power::device::syscall_device_power_management(cmd as u64, arg1 as u64, arg2 as u64, 0, 0, 0, 0);
+    if result < 0 {
+        Err(SyscallError::NotSupported)
+    } else {
+        Ok(result as usize)
+    }
 }

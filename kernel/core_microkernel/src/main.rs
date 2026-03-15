@@ -10,6 +10,9 @@ mod task;
 mod syscall;
 mod interrupt;
 mod console;
+mod ipc;
+mod security;
+mod power;
 
 // 导入全局内存分配器
 use crate::mm::physical;
@@ -34,7 +37,7 @@ unsafe impl core::alloc::GlobalAlloc for DummyAllocator {
 static GLOBAL_ALLOCATOR: DummyAllocator = DummyAllocator;
 
 // 导入设备服务
-use moyuan_device_service;
+
 
 // 启动信息结构
 #[repr(C)]
@@ -116,6 +119,20 @@ fn init_kernel(boot_info: *mut BootInfo) {
     
     // 初始化系统调用
     init_syscalls();
+    
+    // 初始化IPC模块
+    print!("初始化IPC模块...\n");
+    ipc::pipe::init();
+    ipc::shared_memory::init();
+    ipc::semaphore::init();
+    
+    // 初始化安全模块
+    print!("初始化安全模块...\n");
+    security::init();
+    
+    // 初始化电源管理
+    print!("初始化电源管理...\n");
+    power::init();
     
     // 初始化设备服务
     print!("初始化设备服务...\n");

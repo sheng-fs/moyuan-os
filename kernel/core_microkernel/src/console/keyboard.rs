@@ -327,7 +327,7 @@ extern "C" fn keyboard_irq_handler() -> ! {
                     // 查找对应的字符
                     let char_option = if SHIFT_PRESSED {
                         SCANCODE_MAP_SHIFT[key_code as usize]
-                    } else if CAPS_LOCK && key_code >= 16 && key_code <= 35 {
+                    } else if CAPS_LOCK && (16..=35).contains(&key_code) {
                         // 大写字母
                         SCANCODE_MAP_SHIFT[key_code as usize]
                     } else {
