@@ -11,7 +11,7 @@ name = "shell"
 path = "src/main.rs"
 
 [dependencies]
-moyuan_libc = { path = "../../userland/libs/libc" }
+moyuan-libc = { path = "../../userland/libs/libc" }
 
 [profile.dev]
 debug = true

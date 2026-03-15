@@ -32,7 +32,7 @@ all: boot kernel uefi_bootloader
 boot:
 	@echo "编译引导汇编..."
 	@mkdir -p target/$(TARGET)/debug
-	@$(NASM) -f elf64 $(BOOT_ASM) -o target/$(TARGET)/debug/boot.o
+	@$(NASM) -f elf32 $(BOOT_ASM) -o target/$(TARGET)/debug/boot.o
 	@ar rcs $(BOOT_OBJ) target/$(TARGET)/debug/boot.o
 
 # 构建内核
