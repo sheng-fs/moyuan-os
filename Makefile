@@ -78,4 +78,38 @@ run_uefi:
 	@echo "运行UEFI模拟器..."
 	@qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -hda fat:rw:$(OUTPUT_DIR) -m 512M
 
-.PHONY: all boot kernel test_kernel uefi_bootloader clean run run_test run_uefi
+# 调试构建（包含调试信息）
+debug_build:
+	@mkdir -p $(OUTPUT_DIR)
+	@echo "构建调试内核..."
+	@$(CARGO) build --target $(TARGET)
+	@cp target/$(TARGET)/debug/kernel $(KERNEL)
+
+# 运行调试环境（GDB + QEMU）
+debug:
+	@echo "运行调试环境..."
+	@qemu-system-x86_64 \
+		-kernel $(KERNEL) \
+		-m 512M \
+		-smp 4 \
+		-netdev user,id=net0,net=192.168.1.0/24,dhcpstart=192.168.1.100 \
+		-device e1000,netdev=net0 \
+		-enable-kvm \
+		-device intel-iommu \
+		-s -S
+
+# 运行调试测试
+debug_test:
+	@echo "运行调试测试..."
+	@qemu-system-x86_64 \
+		-kernel $(TEST_KERNEL) \
+		-m 512M \
+		-smp 4 \
+		-netdev user,id=net0,net=192.168.1.0/24,dhcpstart=192.168.1.100 \
+		-device e1000,netdev=net0 \
+		-enable-kvm \
+		-device intel-iommu \
+		-serial stdio \
+		-s -S
+
+.PHONY: all boot kernel test_kernel uefi_bootloader clean run run_test run_uefi debug_build debug debug_test
