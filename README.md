@@ -50,7 +50,7 @@
 
 - **基于 Rust 语言**：利用 Rust 的内存安全特性，提供更安全的系统环境
 - **微内核设计**：核心功能最小化，其他功能通过服务实现
-- **多架构支持**：支持 x86_64、AArch64 和 RISC-V 架构
+- **多架构支持**：支持 x86\_64、AArch64 和 RISC-V 架构
 - **模块化设计**：系统组件高度模块化，便于扩展和维护
 - **安全优先**：内置安全机制，保护系统和用户数据
 - **现代化服务**：提供容器、网络、GUI 等现代操作系统服务
@@ -101,7 +101,7 @@ make clean
 ### 内核
 
 - **核心微内核**：提供进程管理、内存管理、中断处理等基础功能
-- **架构支持**：支持 x86_64、AArch64 和 RISC-V 架构
+- **架构支持**：支持 x86\_64、AArch64 和 RISC-V 架构
 - **兼容层**：提供 POSIX、Linux 和 RTOS 兼容层
 
 ### 系统服务
@@ -131,10 +131,10 @@ make clean
 
 - 遵循 Rust 官方代码风格
 - 使用 4 空格缩进
-- 文件名使用 snake_case
-- 模块名使用 snake_case
+- 文件名使用 snake\_case
+- 模块名使用 snake\_case
 - 结构体和枚举使用 PascalCase
-- 函数和变量使用 snake_case
+- 函数和变量使用 snake\_case
 
 ### 贡献流程
 
@@ -150,8 +150,8 @@ make clean
 
 ## 联系方式
 
-- 项目主页：[https://github.com/moyuan-os/moyuan-os](https://github.com/moyuan-os/moyuan-os)
-- 邮件：contact@moyuan-os.org
+- 项目主页：[https://github.com/sheng-fs/moyuan-os](https://github.com/sheng-fs/moyuan-os)
+- 邮件：<3555679134@qq.com>
 
 ## 致谢
 
