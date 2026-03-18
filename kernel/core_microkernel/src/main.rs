@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-#[cfg(all(not(feature = "test"), not(test)))]
+#[allow(unused_imports)]
 use core::panic::PanicInfo;
 
 // 导入各个模块
@@ -70,12 +70,91 @@ pub struct FramebufferInfo {
     pub bpp: u32,
 }
 
+// 串口输出单个字符（封装为函数，简化代码）
+fn serial_putc(port: u16, c: u8) {
+    while !is_transmit_empty(port) {}
+    unsafe { outb(port, c); }
+}
+
+// 串口输出字符串
+fn serial_puts(port: u16, s: &[u8]) {
+    for &c in s {
+        serial_putc(port, c);
+    }
+}
+
 // 内核主函数
 #[no_mangle]
 extern "C" fn _start(boot_info: *mut BootInfo) -> ! {
-    // 调用 kernel_main 函数
-    kernel_main(boot_info);
-}
+    // 直接通过串口发送一些字符，确认内核被执行
+    unsafe {
+        const SERIAL_PORT: u16 = 0x3F8; // COM1端口
+
+        // ########### 关键：初始化串口（之前缺失）###########
+        outb(SERIAL_PORT + 1, 0x00); // 禁用中断
+        outb(SERIAL_PORT + 3, 0x80); // 波特率除数寄存器（DLAB）置位
+        outb(SERIAL_PORT + 0, 0x03); // 波特率：38400 (0x03对应38400，0x01=9600)
+        outb(SERIAL_PORT + 1, 0x00); // 波特率除数低8位
+        outb(SERIAL_PORT + 3, 0x03); // 8位数据位，1位停止位，无校验（DLAB复位）
+        outb(SERIAL_PORT + 2, 0xC7); // 启用FIFO，清空缓冲区，14字节阈值
+        outb(SERIAL_PORT + 4, 0x0B); // 启用中断，RTS/DSR置位
+
+        // 输出调试信息：内核启动标识+实际加载地址
+        serial_puts(SERIAL_PORT, b"[KERNEL] Start at: 0x");
+        let kernel_base = (*boot_info).kernel_base;
+        let hex_chars = b"0123456789ABCDEF";
+        // 输出64位地址的16进制（从高位到低位）
+        for i in 0..16 {
+            let nibble = ((kernel_base >> (60 - 4*i)) & 0xF) as usize;
+            serial_putc(SERIAL_PORT, hex_chars[nibble]);
+        }
+        serial_puts(SERIAL_PORT, b"\n[KERNEL] Sending KER...\n");
+
+        // 原有的KER输出逻辑
+        serial_putc(SERIAL_PORT, b'K');
+        serial_putc(SERIAL_PORT, b'E');
+        serial_putc(SERIAL_PORT, b'R');
+        serial_putc(SERIAL_PORT, b'\n');
+    }
+        
+        #[cfg(feature = "test")]
+        {
+            // 测试模式下调用 test_main 函数
+            test_main(boot_info);
+        }
+        #[cfg(not(feature = "test"))]
+        {
+            // 正常模式下调用 kernel_main 函数
+            kernel_main(boot_info);
+        }
+    }
+    
+    // 内联汇编函数
+    unsafe fn outb(port: u16, value: u8) {
+        core::arch::asm!(
+            "out dx, al",
+            in("dx") port,
+            in("al") value,
+            options(nomem, nostack)
+        );
+    }
+    
+    unsafe fn inb(port: u16) -> u8 {
+        let value: u8;
+        core::arch::asm!(
+            "in al, dx",
+            out("al") value,
+            in("dx") port,
+            options(nomem, nostack)
+        );
+        value
+    }
+    
+    fn is_transmit_empty(port: u16) -> bool {
+        unsafe {
+            inb(port + 5) & 0x20 != 0
+        }
+    }
 
 // 内核主函数
 #[no_mangle]
@@ -230,9 +309,21 @@ fn panic(info: &PanicInfo) -> ! {
     }
 }
 
+// 测试模式的恐慌处理
+#[cfg(feature = "test")]
+#[panic_handler]
+fn panic_test(info: &PanicInfo) -> ! {
+    // 打印恐慌信息
+    print!("测试内核恐慌: {}\n", info);
+    loop {
+        // 无限循环
+        unsafe { core::arch::asm!("hlt"); }
+    }
+}
+
 // 测试入口点
 #[cfg(feature = "test")]
-extern "C" fn test_main(boot_info: *mut BootInfo) -> ! {
+pub extern "C" fn test_main(boot_info: *mut BootInfo) -> ! {
     // 初始化控制台
     console::init();
     
@@ -268,12 +359,12 @@ fn test_memory_management() {
     print!("测试内存管理...\n");
     // 测试物理内存分配
     let page = mm::physical::allocate_page();
-    assert!(page.is_some(), "物理内存分配失败");
+    assert!(page.is_ok(), "物理内存分配失败");
     print!("物理内存分配成功: {:#x}\n", page.unwrap());
     
     // 测试物理内存释放
-    if let Some(addr) = page {
-        mm::physical::free_page(addr);
+    if let Ok(addr) = page {
+        mm::physical::free_page(addr).unwrap();
         print!("物理内存释放成功: {:#x}\n", addr);
     }
 }

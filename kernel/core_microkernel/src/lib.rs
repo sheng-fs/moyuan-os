@@ -34,6 +34,7 @@ pub struct FramebufferInfo {
 }
 
 // 全局内存分配器实现
+#[allow(dead_code)]
 struct DummyAllocator;
 
 unsafe impl core::alloc::GlobalAlloc for DummyAllocator {
@@ -48,7 +49,8 @@ unsafe impl core::alloc::GlobalAlloc for DummyAllocator {
     }
 }
 
-// 注册全局内存分配器
+// 注册全局内存分配器 (仅在库模式下使用)
+#[cfg(not(any(feature = "test", test)))]
 #[global_allocator]
 static GLOBAL_ALLOCATOR: DummyAllocator = DummyAllocator;
 

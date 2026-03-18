@@ -12,23 +12,25 @@ PHDRS {
 SECTIONS {
     . = 0x800000;
 
+    /* PVH ELF Note */
+    .note.pvh : {
+        . = ALIGN(8);
+        BYTE(0x04) BYTE(0x00) BYTE(0x00) BYTE(0x00) /* namesz */
+        BYTE(0x00) BYTE(0x00) BYTE(0x00) BYTE(0x00) /* descsz */
+        BYTE(0x01) BYTE(0x00) BYTE(0x00) BYTE(0x00) /* type */
+        BYTE(0x50) BYTE(0x56) BYTE(0x48) BYTE(0x00) /* "PVH" */
+        . = ALIGN(8);
+    } :text
+
+    /* Text section */
     .text : {
         *(.text)
         *(.rodata)
     } :text
 
+    /* Data section */
     .data : {
         *(.data)
         *(.bss)
     } :data
-
-    /* PVH ELF Note */
-    .note.pvh : {
-        . = ALIGN(4);
-        LONG(0x00000004) /* namesz */
-        LONG(0x00000000) /* descsz */
-        LONG(0x00000001) /* type */
-        BYTE(0x50) BYTE(0x56) BYTE(0x48) BYTE(0x00) /* "PVH" */
-        . = ALIGN(8);
-    } :text
 }

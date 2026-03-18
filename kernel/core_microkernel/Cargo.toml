@@ -19,7 +19,7 @@ cc = "1.0"
 
 [target.x86_64-unknown-none]
 linker = "rust-lld"
-rustflags = ["-C", "link-arg=-Tlinker.ld"]
+rustflags = ["-C", "link-arg=-Tlinker.ld", "-C", "relocation-model=static"]
 
 [profile.dev]
 debug = true
@@ -39,5 +39,5 @@ path = "src/main.rs"
 
 [[bin]]
 name = "test_kernel"
-path = "src/test.rs"
+path = "src/main.rs"
 required-features = ["test"]

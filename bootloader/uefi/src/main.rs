@@ -81,8 +81,14 @@ fn efi_main(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status
     println!("帧缓冲区信息: 宽={}, 高={}, 地址={:#x}", framebuffer_info.width, framebuffer_info.height, framebuffer_info.address);
 
     // 加载内核到固定地址 0x800000
-    let (kernel_address, kernel_size) = load_kernel(&system_table, image_handle, 0x800000).expect("Failed to load kernel");
+    let target_address = 0x800000;
+    let (kernel_address, kernel_size) = load_kernel(&system_table, image_handle, target_address).expect("Failed to load kernel");
     println!("内核加载成功，地址: {:#x}, 大小: {} 字节", kernel_address, kernel_size);
+    
+    // 确保内核加载到了预期的地址
+    if kernel_address != target_address {
+        println!("警告: 内核加载到了非预期地址，可能会导致执行错误");
+    }
 
     // 准备启动信息
     let boot_info = BootInfo {
@@ -107,21 +113,52 @@ fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle, target_ad
     
     // 打开文件系统
     let mut file_system = match boot_services.get_image_file_system(image_handle) {
-        Ok(fs) => fs,
-        Err(_) => return Err(Status::NOT_FOUND),
+        Ok(fs) => {
+            println!("文件系统获取成功");
+            fs
+        },
+        Err(e) => {
+            println!("文件系统获取失败: {:?}", e);
+            return Err(Status::NOT_FOUND);
+        },
     };
     
     // 打开根目录
     let mut root_dir = match file_system.open_volume() {
-        Ok(dir) => dir,
-        Err(_) => return Err(Status::NOT_FOUND),
+        Ok(dir) => {
+            println!("根目录打开成功");
+            dir
+        },
+        Err(e) => {
+            println!("根目录打开失败: {:?}", e);
+            return Err(Status::NOT_FOUND);
+        },
+    };
+    
+    // 尝试打开kernel目录
+    println!("尝试打开kernel目录...");
+    let mut kernel_dir = match root_dir.open(cstr16!("kernel"), FileMode::Read, FileAttribute::DIRECTORY) {
+        Ok(dir) => {
+            println!("kernel目录打开成功");
+            dir
+        },
+        Err(e) => {
+            println!("kernel目录打开失败: {:?}", e);
+            return Err(Status::NOT_FOUND);
+        },
     };
     
     // 打开内核文件
     let kernel_path = cstr16!("kernel.elf");
-    let mut kernel_file = match root_dir.open(kernel_path, FileMode::Read, FileAttribute::empty()) {
-        Ok(file) => file,
-        Err(_) => return Err(Status::NOT_FOUND),
+    let mut kernel_file = match kernel_dir.open(kernel_path, FileMode::Read, FileAttribute::empty()) {
+        Ok(file) => {
+            println!("内核文件打开成功");
+            file
+        },
+        Err(e) => {
+            println!("内核文件打开失败: {:?}", e);
+            return Err(Status::NOT_FOUND);
+        },
     };
     
     // 获取文件大小
@@ -132,40 +169,85 @@ fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle, target_ad
     };
     let kernel_size = file_info.file_size();
     
-    // 分配内存用于加载内核
+    // 尝试分配内存到目标地址，强制成功
+    println!("尝试分配到0x800000地址...");
     let kernel_buffer = match boot_services.allocate_pages(
-        AllocateType::AnyPages,
+        AllocateType::Address(target_address / 4096),
         MemoryType::LOADER_DATA,
         ((kernel_size + 4095) / 4096) as usize,
     ) {
-        Ok(buffer) => buffer,
-        Err(_) => return Err(Status::OUT_OF_RESOURCES),
+        Ok(buffer) => {
+            println!("成功分配到目标地址: {:#x}", buffer);
+            buffer
+        },
+        Err(e) => {
+            println!("无法分配到目标地址 {:#x}，错误: {:?}", target_address, e);
+            println!("使用任意地址...");
+            match boot_services.allocate_pages(
+                AllocateType::AnyPages,
+                MemoryType::LOADER_DATA,
+                ((kernel_size + 4095) / 4096) as usize,
+            ) {
+                Ok(buffer) => buffer,
+                Err(_) => return Err(Status::OUT_OF_RESOURCES),
+            }
+        }
     };
     
-    // 由于 FileHandle 没有 read 方法，我们暂时使用一个简单的实现
-    // 实际实现中，我们需要使用正确的 UEFI API 来读取文件
-    // 这里我们假设内核已经加载到了目标地址
-    
-    // 释放临时缓冲区
-    unsafe {
-        match boot_services.free_pages(kernel_buffer, ((kernel_size + 4095) / 4096) as usize) {
-            Ok(_) => (),
-            Err(_) => return Err(Status::DEVICE_ERROR),
-        }
+    // 读取内核文件到内存
+    let buffer = unsafe { core::slice::from_raw_parts_mut(kernel_buffer as *mut u8, kernel_size as usize) };
+    let mut file = kernel_file.into_regular_file().expect("Failed to convert to regular file");
+    match file.read(buffer) {
+        Ok(size) => if size != kernel_size as usize {
+            return Err(Status::DEVICE_ERROR);
+        },
+        Err(_) => return Err(Status::DEVICE_ERROR),
     }
     
-    Ok((target_address, kernel_size))
+    Ok((kernel_buffer, kernel_size))
+}
+
+/// ELF头部结构
+#[repr(C)]
+struct Elf64Ehdr {
+    e_ident: [u8; 16],      // ELF标识
+    e_type: u16,             // 对象文件类型
+    e_machine: u16,          // 机器类型
+    e_version: u32,          // 对象文件版本
+    e_entry: u64,            // 入口点地址
+    e_phoff: u64,            // 程序头表偏移
+    e_shoff: u64,            // 节头表偏移
+    e_flags: u32,             // 处理器特定标志
+    e_ehsize: u16,           // ELF头部大小
+    e_phentsize: u16,        // 程序头表项大小
+    e_phnum: u16,             // 程序头表项数量
+    e_shentsize: u16,        // 节头表项大小
+    e_shnum: u16,             // 节头表项数量
+    e_shstrndx: u16,          // 节头字符串表索引
 }
 
 /// 跳转到内核
 fn jump_to_kernel(kernel_address: u64, boot_info: &BootInfo) -> ! {
     // 确保引导服务不再被使用
     unsafe {
-        // 获取内核入口点（假设内核入口点在文件开头）
-        let kernel_entry = kernel_address as *const KernelEntry;
-        let kernel_entry = core::ptr::read(kernel_entry);
+        // 解析ELF文件的入口点
+        let elf_header = kernel_address as *const Elf64Ehdr;
+        let entry_point = (*elf_header).e_entry;
         
-        // 跳转到内核
+        let actual_entry = if kernel_address == 0x800000 {
+            // 如果内核加载到了预期地址，直接使用ELF入口点
+            entry_point
+        } else {
+            // 否则，计算相对于加载地址的偏移
+            kernel_address + (entry_point - 0x800000)
+        };
+        
+        println!("内核加载地址: {:#x}", kernel_address);
+        println!("ELF入口点地址: {:#x}", entry_point);
+        println!("实际入口点地址: {:#x}", actual_entry);
+        
+        // 跳转到内核入口点
+        let kernel_entry: KernelEntry = core::mem::transmute(actual_entry as *const ());
         kernel_entry(boot_info as *const _ as *mut _);
     }
 }
