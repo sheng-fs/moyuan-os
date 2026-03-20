@@ -4,42 +4,6 @@
 #[allow(unused_imports)]
 use core::panic::PanicInfo;
 
-// 导入各个模块
-mod mm;
-mod task;
-mod syscall;
-mod interrupt;
-mod console;
-mod ipc;
-mod security;
-mod power;
-
-// 导入全局内存分配器
-use crate::mm::physical;
-
-// 全局内存分配器实现
-struct DummyAllocator;
-
-unsafe impl core::alloc::GlobalAlloc for DummyAllocator {
-    unsafe fn alloc(&self, _layout: core::alloc::Layout) -> *mut u8 {
-        // 从物理内存分配器分配内存
-        physical::allocate_page().unwrap() as *mut u8
-    }
-    
-    unsafe fn dealloc(&self, ptr: *mut u8, _layout: core::alloc::Layout) {
-        // 释放内存
-        let _ = physical::free_page(ptr as usize);
-    }
-}
-
-// 注册全局内存分配器
-#[global_allocator]
-static GLOBAL_ALLOCATOR: DummyAllocator = DummyAllocator;
-
-// 导入设备服务
-
-
-// 启动信息结构
 #[repr(C)]
 pub struct BootInfo {
     pub memory_map: *const MemoryMapEntry,
@@ -49,7 +13,6 @@ pub struct BootInfo {
     pub kernel_size: u64,
 }
 
-// 内存映射条目
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct MemoryMapEntry {
@@ -60,7 +23,6 @@ pub struct MemoryMapEntry {
     pub attribute: u64,
 }
 
-// 帧缓冲区信息
 #[repr(C)]
 pub struct FramebufferInfo {
     pub address: u64,
@@ -70,351 +32,79 @@ pub struct FramebufferInfo {
     pub bpp: u32,
 }
 
-// 串口输出单个字符（封装为函数，简化代码）
+unsafe fn outb(port: u16, value: u8) {
+    core::arch::asm!(
+        "out dx, al",
+        in("dx") port,
+        in("al") value,
+        options(nomem, nostack)
+    );
+}
+
+unsafe fn inb(port: u16) -> u8 {
+    let value: u8;
+    core::arch::asm!(
+        "in al, dx",
+        out("al") value,
+        in("dx") port,
+        options(nomem, nostack)
+    );
+    value
+}
+
+fn is_transmit_empty(port: u16) -> bool {
+    unsafe { inb(port + 5) & 0x20 != 0 }
+}
+
 fn serial_putc(port: u16, c: u8) {
     while !is_transmit_empty(port) {}
     unsafe { outb(port, c); }
 }
 
-// 串口输出字符串
 fn serial_puts(port: u16, s: &[u8]) {
     for &c in s {
         serial_putc(port, c);
     }
 }
 
-// 内核主函数
+fn print_hex(port: u16, value: u64) {
+    let hex_chars = b"0123456789ABCDEF";
+    serial_puts(port, b"0x");
+    for i in 0..16 {
+        let nibble = ((value >> (60 - 4 * i)) & 0xF) as usize;
+        serial_putc(port, hex_chars[nibble]);
+    }
+}
+
 #[no_mangle]
 extern "C" fn _start(boot_info: *mut BootInfo) -> ! {
-    // 直接通过串口发送一些字符，确认内核被执行
     unsafe {
-        const SERIAL_PORT: u16 = 0x3F8; // COM1端口
+        const SERIAL_PORT: u16 = 0x3F8;
 
-        // ########### 关键：初始化串口（之前缺失）###########
-        outb(SERIAL_PORT + 1, 0x00); // 禁用中断
-        outb(SERIAL_PORT + 3, 0x80); // 波特率除数寄存器（DLAB）置位
-        outb(SERIAL_PORT + 0, 0x03); // 波特率：38400 (0x03对应38400，0x01=9600)
-        outb(SERIAL_PORT + 1, 0x00); // 波特率除数低8位
-        outb(SERIAL_PORT + 3, 0x03); // 8位数据位，1位停止位，无校验（DLAB复位）
-        outb(SERIAL_PORT + 2, 0xC7); // 启用FIFO，清空缓冲区，14字节阈值
-        outb(SERIAL_PORT + 4, 0x0B); // 启用中断，RTS/DSR置位
+        outb(SERIAL_PORT + 1, 0x00);
+        outb(SERIAL_PORT + 3, 0x80);
+        outb(SERIAL_PORT + 0, 0x03);
+        outb(SERIAL_PORT + 1, 0x00);
+        outb(SERIAL_PORT + 3, 0x03);
+        outb(SERIAL_PORT + 2, 0xC7);
+        outb(SERIAL_PORT + 4, 0x0B);
 
-        // 输出调试信息：内核启动标识+实际加载地址
-        serial_puts(SERIAL_PORT, b"[KERNEL] Start at: 0x");
-        let kernel_base = (*boot_info).kernel_base;
-        let hex_chars = b"0123456789ABCDEF";
-        // 输出64位地址的16进制（从高位到低位）
-        for i in 0..16 {
-            let nibble = ((kernel_base >> (60 - 4*i)) & 0xF) as usize;
-            serial_putc(SERIAL_PORT, hex_chars[nibble]);
-        }
-        serial_puts(SERIAL_PORT, b"\n[KERNEL] Sending KER...\n");
-
-        // 原有的KER输出逻辑
-        serial_putc(SERIAL_PORT, b'K');
-        serial_putc(SERIAL_PORT, b'E');
-        serial_putc(SERIAL_PORT, b'R');
-        serial_putc(SERIAL_PORT, b'\n');
-    }
-        
-        #[cfg(feature = "test")]
-        {
-            // 测试模式下调用 test_main 函数
-            test_main(boot_info);
-        }
-        #[cfg(not(feature = "test"))]
-        {
-            // 正常模式下调用 kernel_main 函数
-            kernel_main(boot_info);
-        }
-    }
-    
-    // 内联汇编函数
-    unsafe fn outb(port: u16, value: u8) {
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") port,
-            in("al") value,
-            options(nomem, nostack)
-        );
-    }
-    
-    unsafe fn inb(port: u16) -> u8 {
-        let value: u8;
-        core::arch::asm!(
-            "in al, dx",
-            out("al") value,
-            in("dx") port,
-            options(nomem, nostack)
-        );
-        value
-    }
-    
-    fn is_transmit_empty(port: u16) -> bool {
-        unsafe {
-            inb(port + 5) & 0x20 != 0
-        }
+        serial_puts(SERIAL_PORT, b"[KERNEL] MOYUAN OS Kernel Started!\n");
+        serial_puts(SERIAL_PORT, b"[KERNEL] Boot Info Addr: ");
+        print_hex(SERIAL_PORT, boot_info as u64);
+        serial_puts(SERIAL_PORT, b"\n");
+        serial_puts(SERIAL_PORT, b"[KERNEL] System running in infinite loop...\n");
     }
 
-// 内核主函数
-#[no_mangle]
-extern "C" fn kernel_main(boot_info: *mut BootInfo) -> ! {
-    // 初始化控制台
-    console::init();
-    
-    // 加载终端背景
-    console::vga::load_background();
-    
-    // 显示系统LOGO
-    console::vga::display_logo();
-    
-    // 打印启动信息
-    print!("墨渊操作系统内核启动中...\n");
-    print!("内核基地址: {:#x}, 大小: {} 字节\n", unsafe { (*boot_info).kernel_base }, unsafe { (*boot_info).kernel_size });
-    
-    // 初始化内核
-    init_kernel(boot_info);
-    
-    // 打印启动完成信息
-    print!("墨渊操作系统启动完成！\n");
-    
-    // 进入主循环
     loop {
-        // 这里将来会运行调度器
         unsafe { core::arch::asm!("hlt"); }
     }
 }
 
-// 初始化内核
-fn init_kernel(boot_info: *mut BootInfo) {
-    // 初始化内存管理
-    init_memory(boot_info);
-    
-    // 初始化中断处理
-    init_interrupts();
-    
-    // 初始化进程管理
-    init_processes();
-    
-    // 初始化系统调用
-    init_syscalls();
-    
-    // 初始化IPC模块
-    print!("初始化IPC模块...\n");
-    ipc::pipe::init();
-    ipc::shared_memory::init();
-    ipc::semaphore::init();
-    
-    // 初始化安全模块
-    print!("初始化安全模块...\n");
-    security::init();
-    
-    // 初始化电源管理
-    print!("初始化电源管理...\n");
-    power::init();
-    
-    // 初始化设备服务
-    print!("初始化设备服务...\n");
-    moyuan_device_service::init();
-}
-
-// 初始化内存管理
-fn init_memory(boot_info: *mut BootInfo) {
-    // 初始化物理内存管理
-    print!("初始化物理内存管理...\n");
-    unsafe {
-        mm::physical::init(boot_info);
-    }
-    
-    // 初始化虚拟内存管理
-    print!("初始化虚拟内存管理...\n");
-    mm::virt::init();
-}
-
-// 初始化中断处理
-fn init_interrupts() {
-    print!("初始化中断处理...\n");
-    // 初始化IDT
-    interrupt::init_idt();
-    
-    // 注册中断处理函数
-    interrupt::register_handlers();
-    
-    // 初始化PIC
-    interrupt::init_pic();
-    
-    // 启用中断
-    interrupt::enable_interrupts();
-}
-
-// 初始化进程管理
-fn init_processes() {
-    print!("初始化进程管理...\n");
-    // 初始化进程管理系统
-    task::init();
-    
-    // 测试多进程创建和调度
-    test_multiprocess();
-}
-
-// 测试多进程创建和调度
-fn test_multiprocess() {
-    print!("测试多进程创建和调度...\n");
-    
-    // 创建两个子进程
-    for _i in 0..2 {
-        // 这里简化处理，实际应该通过系统调用创建进程
-        match task::process::process_create(test_process_entry as *const () as u64, 4096) {
-            Ok(child_pid) => {
-                task::scheduler::add_to_ready_queue(child_pid);
-                print!("创建子进程: {}\n", child_pid);
-            }
-            Err(_) => {
-                print!("创建子进程失败\n");
-            }
-        }
-    }
-}
-
-// 测试进程入口点
-fn test_process_entry() {
-    if let Some(process) = task::process::get_current_process() {
-        let pid = process.pid;
-        loop {
-            print!("进程 {} 运行中...\n", pid);
-            // 简单的延迟
-            for _ in 0..1000000 {
-                unsafe { core::arch::asm!("nop"); }
-            }
-        }
-    }
-}
-
-// 初始化系统调用
-fn init_syscalls() {
-    print!("初始化系统调用...\n");
-    // 初始化系统调用表
-    syscall::init();
-}
-
-// 恐慌处理
-#[cfg(all(not(feature = "test"), not(test)))]
+#[cfg(not(test))]
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    // 打印恐慌信息
-    print!("内核恐慌: {}\n", info);
+fn panic(_info: &PanicInfo) -> ! {
     loop {
-        // 无限循环
         unsafe { core::arch::asm!("hlt"); }
     }
-}
-
-// 测试模式的恐慌处理
-#[cfg(feature = "test")]
-#[panic_handler]
-fn panic_test(info: &PanicInfo) -> ! {
-    // 打印恐慌信息
-    print!("测试内核恐慌: {}\n", info);
-    loop {
-        // 无限循环
-        unsafe { core::arch::asm!("hlt"); }
-    }
-}
-
-// 测试入口点
-#[cfg(feature = "test")]
-pub extern "C" fn test_main(boot_info: *mut BootInfo) -> ! {
-    // 初始化控制台
-    console::init();
-    
-    // 打印测试启动信息
-    print!("墨渊操作系统测试模式启动...\n");
-    
-    // 初始化内核
-    init_kernel(boot_info);
-    
-    // 测试内存管理
-    test_memory_management();
-    
-    // 测试进程管理
-    test_process_management();
-    
-    // 测试系统调用
-    test_syscalls();
-    
-    // 测试中断处理
-    test_interrupts();
-    
-    // 测试完成
-    print!("所有测试完成！\n");
-    loop {
-        // 无限循环
-        unsafe { core::arch::asm!("hlt"); }
-    }
-}
-
-// 测试内存管理
-#[cfg(feature = "test")]
-fn test_memory_management() {
-    print!("测试内存管理...\n");
-    // 测试物理内存分配
-    let page = mm::physical::allocate_page();
-    assert!(page.is_ok(), "物理内存分配失败");
-    print!("物理内存分配成功: {:#x}\n", page.unwrap());
-    
-    // 测试物理内存释放
-    if let Ok(addr) = page {
-        mm::physical::free_page(addr).unwrap();
-        print!("物理内存释放成功: {:#x}\n", addr);
-    }
-}
-
-// 测试进程管理
-#[cfg(feature = "test")]
-fn test_process_management() {
-    print!("测试进程管理...\n");
-    // 测试进程创建
-    match task::process::process_create(test_process_entry as *const () as u64, 4096) {
-        Ok(pid) => {
-            task::scheduler::add_to_ready_queue(pid);
-            print!("进程创建成功，PID: {}\n", pid);
-        }
-        Err(e) => {
-            print!("进程创建失败: {:?}\n", e);
-        }
-    }
-    
-    // 测试进程调度
-    print!("测试进程调度...\n");
-    // 运行一次调度
-    task::scheduler::schedule();
-    print!("进程调度测试完成\n");
-}
-
-// 测试系统调用
-#[cfg(feature = "test")]
-fn test_syscalls() {
-    print!("测试系统调用...\n");
-    // 测试系统调用处理
-    let result = syscall::syscall::handle_syscall(0, 0, 0, 0, 0, 0, 0); // exit系统调用
-    assert_eq!(result, 0, "系统调用处理失败");
-    print!("系统调用测试成功\n");
-}
-
-// 测试中断处理
-#[cfg(feature = "test")]
-fn test_interrupts() {
-    print!("测试中断处理...\n");
-    // 测试中断处理函数注册
-    print!("测试中断处理函数注册...\n");
-    
-    // 测试时钟中断
-    print!("测试时钟中断...\n");
-    // 这里可以触发一个时钟中断来测试
-    
-    // 测试键盘中断
-    print!("测试键盘中断...\n");
-    // 这里可以触发一个键盘中断来测试
-    
-    print!("中断处理测试完成\n");
 }

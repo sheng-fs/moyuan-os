@@ -10,7 +10,7 @@ PHDRS {
 }
 
 SECTIONS {
-    . = 0x800000;
+    . = 0x200000;
 
     /* PVH ELF Note */
     .note.pvh : {

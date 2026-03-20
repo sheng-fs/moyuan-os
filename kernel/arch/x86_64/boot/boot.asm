@@ -1,7 +1,39 @@
+section .multiboot2_header
+align 8
+multiboot2_header_start:
+    ; Multiboot2 魔数
+    dd 0xE85250D6
+    ; 架构 (i386)
+    dd 0
+    ; 头长度
+    dd multiboot2_header_end - multiboot2_header_start
+    ; 校验和
+    dd -(0xE85250D6 + 0 + (multiboot2_header_end - multiboot2_header_start))
+    
+    ; 信息请求标签
+    align 8
+    dw 1
+    dw 0
+    dd 20
+    dd 6   ; 内存映射
+    dd 8   ; 帧缓冲区信息
+    dd 9   ; ELF符号
+    
+    ; 结束标签
+    align 8
+    dw 0
+    dw 0
+    dd 8
+multiboot2_header_end:
+
 section .text
+bits 32
 global _start
 
 _start:
+    ; Multiboot2 会将信息指针放在 ebx 中
+    ; 先保存到 ebx，等进入64位模式后再传递
+    
     ; 进入长模式
     call enter_long_mode
     
@@ -44,6 +76,7 @@ enter_long_mode:
 
 ; 64位入口点
 long_mode_start:
+    bits 64
     ; 清零所有段寄存器
     mov ax, 0
     mov ss, ax
@@ -52,13 +85,16 @@ long_mode_start:
     mov fs, ax
     mov gs, ax
     
+    ; 将 Multiboot2 信息指针从 ebx 传递到 rdi (第一个参数)
+    mov edi, ebx
+    
     ; 跳转到内核主函数或测试入口点
     %ifdef TEST
         extern test_main
         call test_main
     %else
-        extern kernel_main
-        call kernel_main
+        extern _start
+        call _start
     %endif
     
     ; 无限循环

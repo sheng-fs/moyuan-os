@@ -21,19 +21,8 @@ TEST_KERNEL = $(TEST_OUTPUT_DIR)/test_kernel.elf
 # 引导加载器构建目标
 UEFI_BOOTLOADER = $(OUTPUT_DIR)/bootloader.efi
 
-# 引导汇编文件
-BOOT_ASM = kernel/arch/x86_64/boot/boot.asm
-BOOT_OBJ = target/$(TARGET)/debug/libboot.a
-
 # 构建目标
-all: boot kernel uefi_bootloader
-
-# 编译引导汇编
-boot:
-	@echo "编译引导汇编..."
-	@mkdir -p target/$(TARGET)/debug
-	@$(NASM) -f elf32 $(BOOT_ASM) -o target/$(TARGET)/debug/boot.o
-	@ar rcs $(BOOT_OBJ) target/$(TARGET)/debug/boot.o
+all: kernel uefi_bootloader
 
 # 构建内核
 kernel:
@@ -82,7 +71,7 @@ run_uefi:
 debug_build:
 	@mkdir -p $(OUTPUT_DIR)
 	@echo "构建调试内核..."
-	@RUSTFLAGS="-C link-arg=-Tkernel/core_microkernel/linker.ld -C relocation-model=static" $(CARGO) build --target $(TARGET)
+	@RUSTFLAGS="-C link-arg=-Tkernel/core_microkernel/linker.ld -C relocation-model=pic" $(CARGO) build --target $(TARGET)
 	@cp target/$(TARGET)/debug/kernel $(KERNEL)
 
 # 运行UEFI调试环境（GDB + QEMU）
@@ -96,6 +85,19 @@ debug_uefi:
 		-accel tcg \
 		-vga std \
 		-serial stdio \
+		-s \
+		-S
+
+# 运行GRUB调试环境（GDB + QEMU）
+debug_grub:
+	@echo "运行GRUB调试环境..."
+	@qemu-system-x86_64 \
+		-cdrom /tmp/moyuan_os.iso \
+		-m 2G \
+		-net none \
+		-accel tcg \
+		-vga std \
+		-serial mon:stdio \
 		-s \
 		-S
 
@@ -126,4 +128,4 @@ debug_test:
 		-serial stdio \
 		-s -S
 
-.PHONY: all boot kernel test_kernel uefi_bootloader clean run run_test run_uefi debug_build debug_uefi debug debug_test
+.PHONY: all kernel test_kernel uefi_bootloader clean run run_test run_uefi debug_build debug_uefi debug_grub debug debug_test
