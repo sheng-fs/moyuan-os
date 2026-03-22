@@ -15,6 +15,7 @@ struct IdtEntry {
 
 // IDT 描述符
 #[repr(C, packed)]
+#[allow(dead_code)]
 struct IdtDescriptor {
     limit: u16,
     base: u64,
@@ -35,6 +36,7 @@ static mut IDT: [IdtEntry; 256] = [IdtEntry {
 type InterruptHandler = extern "C" fn() -> !;
 
 // 初始化IDT
+#[allow(dead_code)]
 pub fn init_idt() {
     unsafe {
         // 设置IDT描述符
@@ -56,6 +58,7 @@ pub fn init_idt() {
 }
 
 // 注册中断处理函数
+#[allow(dead_code)]
 pub fn register_handlers() {
     // 注册CPU异常处理函数
     register_interrupt_handler(0, divide_by_zero_handler);
@@ -254,10 +257,10 @@ extern "C" fn timer_interrupt_handler() -> ! {
             crate::console::print(core::format_args!("时钟中断: {}\n", current_count));
         }
         
-        // 触发调度
-        if current_count % 10 == 0 { // 每10个时钟中断触发一次调度
-            crate::task::scheduler::schedule();
-        }
+        // 触发调度（暂时注释掉）
+        // if current_count % 10 == 0 { // 每10个时钟中断触发一次调度
+        //     crate::task::scheduler::schedule();
+        // }
         
         // 发送EOI
         asm!(
@@ -293,6 +296,7 @@ impl Default for Pic {
 
 impl Pic {
     // 初始化PIC
+    #[allow(dead_code)]
     pub fn init(&mut self) {
         unsafe {
             // 初始化主PIC和从PIC
@@ -374,6 +378,7 @@ impl Pic {
 static mut PIC: Option<Pic> = None;
 
 // 初始化PIC
+#[allow(dead_code)]
 pub fn init_pic() {
     unsafe {
         PIC = Some(Pic::default());
@@ -404,6 +409,7 @@ pub fn mask_irq(irq: u8) {
 }
 
 // 启用中断
+#[allow(dead_code)]
 pub fn enable_interrupts() {
     unsafe {
         asm!("sti");

@@ -1,3 +1,6 @@
+// 导入mm模块
+use crate::mm::{physical, virt};
+
 // 文件描述符结构
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -18,7 +21,7 @@ pub struct ProcessControlBlock {
     // 进程优先级
     pub priority: u8,
     // 进程的地址空间
-    pub address_space: crate::mm::virt::AddressSpace,
+    pub address_space: virt::AddressSpace,
     // 进程的堆栈指针
     pub stack_pointer: u64,
     // 进程的程序计数器
@@ -117,7 +120,7 @@ pub fn process_create(entry_point: u64, _stack_size: u64) -> Result<usize, Proce
         NEXT_PID += 1;
         
         // 创建地址空间
-        let mut address_space = crate::mm::virt::AddressSpace::new();
+        let mut address_space = virt::AddressSpace::new();
         address_space.init();
         
         // 检查地址空间初始化是否成功
@@ -126,7 +129,7 @@ pub fn process_create(entry_point: u64, _stack_size: u64) -> Result<usize, Proce
         }
         
         // 分配堆栈
-        let stack_start = match crate::mm::physical::allocate_page() {
+        let stack_start = match physical::allocate_page() {
             Ok(addr) => addr as u64,
             Err(_) => return Err(ProcessError::StackAllocationFailed),
         };
@@ -174,7 +177,7 @@ pub fn process_exit(pid: usize) {
             
             // 释放堆栈
             let stack_start = process.stack_pointer - 4096;
-            match crate::mm::physical::free_page(stack_start as usize) {
+            match physical::free_page(stack_start as usize) {
                 Ok(()) => {},
                 Err(err) => {
                     crate::console::print(core::format_args!("警告: 释放进程堆栈失败: {:?}\n", err));
@@ -200,7 +203,7 @@ impl Drop for ProcessControlBlock {
         
         // 释放堆栈
         let stack_start = self.stack_pointer - 4096;
-        if let Err(err) = crate::mm::physical::free_page(stack_start as usize) {
+        if let Err(err) = physical::free_page(stack_start as usize) {
             // 这里不能使用print，因为drop可能在任何上下文中被调用
             // 只记录错误，不做其他处理
             core::panic!("释放进程堆栈失败: {:?}", err);

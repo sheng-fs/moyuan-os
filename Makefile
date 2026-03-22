@@ -44,6 +44,8 @@ uefi_bootloader:
 	@echo "构建UEFI引导加载器..."
 	@cd bootloader/uefi && $(CARGO) build --target x86_64-unknown-uefi --release
 	@cp target/x86_64-unknown-uefi/release/moyuan-uefi-bootloader.efi $(UEFI_BOOTLOADER)
+	@mkdir -p $(OUTPUT_DIR)/EFI/BOOT
+	@cp target/x86_64-unknown-uefi/release/moyuan-uefi-bootloader.efi $(OUTPUT_DIR)/EFI/BOOT/BOOTX64.EFI
 
 # 清理构建产物
 clean:
@@ -65,7 +67,7 @@ run_test:
 # 运行UEFI模拟器
 run_uefi:
 	@echo "运行UEFI模拟器..."
-	@qemu-system-x86_64 -bios /usr/share/qemu/OVMF.fd -hda fat:rw:$(OUTPUT_DIR) -m 2G
+	@qemu-system-x86_64 -bios /usr/share/qemu/OVMF.fd -hda fat:rw:$(OUTPUT_DIR) -m 2G -serial stdio -vga std
 
 # 调试构建（包含调试信息）
 debug_build:

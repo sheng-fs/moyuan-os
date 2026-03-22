@@ -5,6 +5,7 @@ pub mod vga;
 pub mod keyboard;
 
 /// 初始化控制台
+#[allow(dead_code)]
 pub fn init() {
     serial::init();
     vga::init();

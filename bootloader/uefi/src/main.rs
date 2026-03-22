@@ -130,16 +130,9 @@ fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle) -> Result
             return Err(Status::NOT_FOUND);
         },
     };
-    println!("尝试打开kernel目录...");
-    let mut kernel_dir = match root_dir.open(cstr16!("kernel"), FileMode::Read, FileAttribute::DIRECTORY) {
-        Ok(dir) => dir,
-        Err(e) => {
-            println!("kernel目录打开失败: {:?}", e);
-            return Err(Status::NOT_FOUND);
-        },
-    };
+    println!("尝试打开kernel.elf文件...");
     let kernel_path = cstr16!("kernel.elf");
-    let mut kernel_file = match kernel_dir.open(kernel_path, FileMode::Read, FileAttribute::empty()) {
+    let mut kernel_file = match root_dir.open(kernel_path, FileMode::Read, FileAttribute::empty()) {
         Ok(file) => file,
         Err(e) => {
             println!("内核文件打开失败: {:?}", e);

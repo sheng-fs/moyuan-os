@@ -4,6 +4,9 @@
 #[allow(unused_imports)]
 use core::panic::PanicInfo;
 
+mod console;
+mod interrupt;
+
 #[repr(C)]
 pub struct BootInfo {
     pub memory_map: *const MemoryMapEntry,
@@ -78,9 +81,12 @@ fn print_hex(port: u16, value: u64) {
 
 #[no_mangle]
 extern "C" fn _start(boot_info: *mut BootInfo) -> ! {
+    const SERIAL_PORT: u16 = 0x3F8;
+    
+    use core::fmt;
+    use core::fmt::Write;
+    
     unsafe {
-        const SERIAL_PORT: u16 = 0x3F8;
-
         outb(SERIAL_PORT + 1, 0x00);
         outb(SERIAL_PORT + 3, 0x80);
         outb(SERIAL_PORT + 0, 0x03);
@@ -93,9 +99,28 @@ extern "C" fn _start(boot_info: *mut BootInfo) -> ! {
         serial_puts(SERIAL_PORT, b"[KERNEL] Boot Info Addr: ");
         print_hex(SERIAL_PORT, boot_info as u64);
         serial_puts(SERIAL_PORT, b"\n");
-        serial_puts(SERIAL_PORT, b"[KERNEL] System running in infinite loop...\n");
-    }
+        serial_puts(SERIAL_PORT, b"[KERNEL] MOYUAN OS Kernel Booting...\n");
+        serial_puts(SERIAL_PORT, b"[KERNEL] Kernel Base: ");
+        print_hex(SERIAL_PORT, (*boot_info).kernel_base);
+        serial_puts(SERIAL_PORT, b", Size: ");
+        let kernel_size = (*boot_info).kernel_size;
 
+        struct SerialWriter;
+        impl fmt::Write for SerialWriter {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                for byte in s.bytes() {
+                    serial_putc(SERIAL_PORT, byte);
+                }
+                Ok(())
+            }
+        }
+        let _ = write!(SerialWriter, "{}", kernel_size);
+
+        serial_puts(SERIAL_PORT, b" bytes\n");
+        serial_puts(SERIAL_PORT, b"[KERNEL] Initialization Complete!\n");
+        serial_puts(SERIAL_PORT, b"[KERNEL] Welcome to MOYUAN OS!\n");
+    }
+    
     loop {
         unsafe { core::arch::asm!("hlt"); }
     }

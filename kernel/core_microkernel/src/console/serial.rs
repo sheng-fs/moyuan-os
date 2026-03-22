@@ -5,6 +5,7 @@ use core::fmt;
 const SERIAL_PORT: u16 = 0x3F8; // COM1 端口
 
 /// 初始化串口
+#[allow(dead_code)]
 pub fn init() {
     unsafe {
         // 禁用中断
