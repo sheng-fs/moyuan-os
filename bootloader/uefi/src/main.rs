@@ -80,7 +80,23 @@ fn efi_main(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status
     let memory_map = system_table.boot_services().memory_map(&mut memory_map_buffer).expect("Failed to get memory map");
     println!("内存映射获取成功: {} 个条目", memory_map.entries().count());
 
-    let mut memory_map_entries = [MemoryMapEntry::default(); 256];
+    let framebuffer_info = FramebufferInfo::default();
+    println!("帧缓冲区信息: 宽={}, 高={}, 地址={:#x}", framebuffer_info.width, framebuffer_info.height, framebuffer_info.address);
+
+    let (kernel_base, kernel_size, entry_point) = load_kernel(&system_table, image_handle).expect("Failed to load kernel");
+    println!("内核加载成功，基地址: {:#x}, 大小: {} 字节, 入口: {:#x}", kernel_base, kernel_size, entry_point);
+
+    // 现在执行所有内存分配
+    let boot_services = system_table.boot_services();
+    
+    // 分配持久内存来存储内存映射
+    let memory_map_ptr = boot_services.allocate_pages(
+        AllocateType::AnyPages,
+        MemoryType::LOADER_DATA,
+        1, // 1页足够存储256个条目
+    ).expect("Failed to allocate memory for memory map") as *mut MemoryMapEntry;
+    
+    let memory_map_entries = unsafe { core::slice::from_raw_parts_mut(memory_map_ptr, 256) };
     let mut entry_count = 0;
     for (i, entry) in memory_map.entries().enumerate() {
         if i >= 256 {
@@ -96,22 +112,25 @@ fn efi_main(image_handle: Handle, mut system_table: SystemTable<Boot>) -> Status
         entry_count += 1;
     }
 
-    let framebuffer_info = FramebufferInfo::default();
-    println!("帧缓冲区信息: 宽={}, 高={}, 地址={:#x}", framebuffer_info.width, framebuffer_info.height, framebuffer_info.address);
+    // 分配持久内存来存储BootInfo
+    let boot_info_ptr = boot_services.allocate_pages(
+        AllocateType::AnyPages,
+        MemoryType::LOADER_DATA,
+        1,
+    ).expect("Failed to allocate memory for BootInfo") as *mut BootInfo;
+    
+    unsafe {
+        *boot_info_ptr = BootInfo {
+            memory_map: memory_map_ptr,
+            memory_map_count: entry_count,
+            framebuffer: framebuffer_info,
+            kernel_base,
+            kernel_size,
+        };
+    }
 
-    let (kernel_base, kernel_size, entry_point) = load_kernel(&system_table, image_handle).expect("Failed to load kernel");
-    println!("内核加载成功，基地址: {:#x}, 大小: {} 字节, 入口: {:#x}", kernel_base, kernel_size, entry_point);
-
-    let boot_info = BootInfo {
-        memory_map: memory_map_entries.as_ptr(),
-        memory_map_count: entry_count,
-        framebuffer: framebuffer_info,
-        kernel_base,
-        kernel_size,
-    };
-
-    println!("准备跳转到内核...");
-    jump_to_kernel(entry_point, &boot_info);
+    // 现在直接跳转到内核，不再调用任何UEFI函数
+    jump_to_kernel(entry_point, boot_info_ptr);
 }
 
 fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle) -> Result<(u64, u64, u64), Status> {
@@ -206,10 +225,10 @@ fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle) -> Result
     Ok((kernel_base, kernel_size, entry_point))
 }
 
-fn jump_to_kernel(entry_point: u64, boot_info: &BootInfo) -> ! {
+fn jump_to_kernel(entry_point: u64, boot_info: *mut BootInfo) -> ! {
     unsafe {
         println!("跳转到内核入口点: {:#x}", entry_point);
         let kernel_entry: KernelEntry = core::mem::transmute(entry_point as *const ());
-        kernel_entry(boot_info as *const _ as *mut _);
+        kernel_entry(boot_info);
     }
 }

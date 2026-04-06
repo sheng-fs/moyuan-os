@@ -80,13 +80,12 @@ fn print_hex(port: u16, value: u64) {
 }
 
 #[no_mangle]
-extern "C" fn _start(boot_info: *mut BootInfo) -> ! {
+extern "C" fn _start(_boot_info: *mut BootInfo) -> ! {
     const SERIAL_PORT: u16 = 0x3F8;
     
-    use core::fmt;
-    use core::fmt::Write;
-    
+    // 最简单的串口输出测试
     unsafe {
+        // 简单初始化串口
         outb(SERIAL_PORT + 1, 0x00);
         outb(SERIAL_PORT + 3, 0x80);
         outb(SERIAL_PORT + 0, 0x03);
@@ -95,28 +94,8 @@ extern "C" fn _start(boot_info: *mut BootInfo) -> ! {
         outb(SERIAL_PORT + 2, 0xC7);
         outb(SERIAL_PORT + 4, 0x0B);
 
+        // 输出测试信息
         serial_puts(SERIAL_PORT, b"[KERNEL] MOYUAN OS Kernel Started!\n");
-        serial_puts(SERIAL_PORT, b"[KERNEL] Boot Info Addr: ");
-        print_hex(SERIAL_PORT, boot_info as u64);
-        serial_puts(SERIAL_PORT, b"\n");
-        serial_puts(SERIAL_PORT, b"[KERNEL] MOYUAN OS Kernel Booting...\n");
-        serial_puts(SERIAL_PORT, b"[KERNEL] Kernel Base: ");
-        print_hex(SERIAL_PORT, (*boot_info).kernel_base);
-        serial_puts(SERIAL_PORT, b", Size: ");
-        let kernel_size = (*boot_info).kernel_size;
-
-        struct SerialWriter;
-        impl fmt::Write for SerialWriter {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                for byte in s.bytes() {
-                    serial_putc(SERIAL_PORT, byte);
-                }
-                Ok(())
-            }
-        }
-        let _ = write!(SerialWriter, "{}", kernel_size);
-
-        serial_puts(SERIAL_PORT, b" bytes\n");
         serial_puts(SERIAL_PORT, b"[KERNEL] Initialization Complete!\n");
         serial_puts(SERIAL_PORT, b"[KERNEL] Welcome to MOYUAN OS!\n");
     }
