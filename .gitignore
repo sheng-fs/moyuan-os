@@ -4,7 +4,9 @@ build/
 
 # IDE和编辑器文件
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.swp
 *.swo
 *~
@@ -27,7 +29,7 @@ build/
 *.bak
 
 # Rust相关
-Cargo.lock
+# Cargo.lock - 对于操作系统项目，保留此文件以确保依赖一致性
 
 # UEFI相关
 *.efi

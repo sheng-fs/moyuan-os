@@ -2,6 +2,8 @@
 name = "moyuan-log-service"
 version = "0.1.0-alpha.1"
 edition = "2021"
+autotests = false
+autobenches = false
 
 [lib]
 path = "src/lib.rs"

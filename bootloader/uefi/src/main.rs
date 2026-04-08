@@ -1,5 +1,6 @@
-#![no_main]
 #![no_std]
+#![cfg_attr(not(test), no_main)]
+#![allow(unexpected_cfgs)]
 
 use uefi::prelude::*;
 use uefi::table::boot::AllocateType;
@@ -167,7 +168,7 @@ fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle) -> Result
     let temp_buffer = match boot_services.allocate_pages(
         AllocateType::AnyPages,
         MemoryType::LOADER_DATA,
-        ((file_size + 4095) / 4096) as usize,
+        (file_size as usize + 4095).div_ceil(4096),
     ) {
         Ok(buffer) => buffer,
         Err(_) => return Err(Status::OUT_OF_RESOURCES),
@@ -203,7 +204,7 @@ fn load_kernel(system_table: &SystemTable<Boot>, image_handle: Handle) -> Result
                 kernel_size = end_addr - kernel_base;
             }
             println!("加载段: vaddr={:#x}, filesz={:#x}, memsz={:#x}", vaddr, filesz, memsz);
-            let pages_needed = ((vaddr + memsz + 4095) / 4096) - (vaddr / 4096);
+            let pages_needed = (vaddr + memsz + 4095).div_ceil(4096) - (vaddr / 4096);
             let target_page = vaddr / 4096;
             let _ = boot_services.allocate_pages(
                 AllocateType::Address(target_page),

@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(unexpected_cfgs)]
 
 // 模拟时间戳函数
 fn get_timestamp() -> u64 {

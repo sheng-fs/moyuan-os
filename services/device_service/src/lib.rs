@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(unexpected_cfgs)]
 
 use core::ffi::c_void;
 use spin::Mutex;

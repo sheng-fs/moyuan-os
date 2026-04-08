@@ -1,5 +1,6 @@
 #![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_main)]
+#![allow(unexpected_cfgs)]
 
 #[allow(unused_imports)]
 use core::panic::PanicInfo;

@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(c_variadic)]
+#![allow(unexpected_cfgs)]
 
 // 系统调用号定义
 pub const SYS_EXIT: usize = 0;
@@ -29,6 +30,9 @@ pub const STDOUT_FILENO: i32 = 1;
 pub const STDERR_FILENO: i32 = 2;
 
 // 系统调用函数
+/// # Safety
+///
+/// 调用者必须确保系统调用号和参数是有效的
 #[inline(always)]
 pub unsafe fn syscall0(number: usize) -> isize {
     let ret: isize;
@@ -43,6 +47,9 @@ pub unsafe fn syscall0(number: usize) -> isize {
     ret
 }
 
+/// # Safety
+///
+/// 调用者必须确保系统调用号和参数是有效的
 #[inline(always)]
 pub unsafe fn syscall1(number: usize, arg1: usize) -> isize {
     let ret: isize;
@@ -58,6 +65,9 @@ pub unsafe fn syscall1(number: usize, arg1: usize) -> isize {
     ret
 }
 
+/// # Safety
+///
+/// 调用者必须确保系统调用号和参数是有效的
 #[inline(always)]
 pub unsafe fn syscall2(number: usize, arg1: usize, arg2: usize) -> isize {
     let ret: isize;
@@ -74,6 +84,9 @@ pub unsafe fn syscall2(number: usize, arg1: usize, arg2: usize) -> isize {
     ret
 }
 
+/// # Safety
+///
+/// 调用者必须确保系统调用号和参数是有效的
 #[inline(always)]
 pub unsafe fn syscall3(number: usize, arg1: usize, arg2: usize, arg3: usize) -> isize {
     let ret: isize;
@@ -103,6 +116,9 @@ pub extern "C" fn exit(status: i32) -> ! {
 }
 
 // 打开文件
+/// # Safety
+///
+/// 调用者必须确保 path 是有效的以零结尾的字符串指针
 #[no_mangle]
 pub extern "C" fn open(path: *const u8, flags: i32, mode: u32) -> i32 {
     unsafe {
@@ -111,6 +127,9 @@ pub extern "C" fn open(path: *const u8, flags: i32, mode: u32) -> i32 {
 }
 
 // 读取文件
+/// # Safety
+///
+/// 调用者必须确保 buf 是有效的指针，并且有足够的空间存储 count 字节
 #[no_mangle]
 pub extern "C" fn read(fd: i32, buf: *mut u8, count: usize) -> isize {
     unsafe {
@@ -119,6 +138,9 @@ pub extern "C" fn read(fd: i32, buf: *mut u8, count: usize) -> isize {
 }
 
 // 写入文件
+/// # Safety
+///
+/// 调用者必须确保 buf 是有效的指针，指向 count 字节的有效数据
 #[no_mangle]
 pub extern "C" fn write(fd: i32, buf: *const u8, count: usize) -> isize {
     unsafe {
@@ -135,6 +157,9 @@ pub extern "C" fn close(fd: i32) -> i32 {
 }
 
 // 删除文件
+/// # Safety
+///
+/// 调用者必须确保 path 是有效的以零结尾的字符串指针
 #[no_mangle]
 pub extern "C" fn unlink(path: *const u8) -> i32 {
     unsafe {
@@ -143,6 +168,9 @@ pub extern "C" fn unlink(path: *const u8) -> i32 {
 }
 
 // 内存分配
+/// # Safety
+///
+/// 调用者必须确保 addr 是有效的指针或 null
 #[no_mangle]
 pub extern "C" fn brk(addr: *mut u8) -> *mut u8 {
     unsafe {
@@ -151,6 +179,9 @@ pub extern "C" fn brk(addr: *mut u8) -> *mut u8 {
 }
 
 // 字符串函数
+/// # Safety
+///
+/// 调用者必须确保 s 是有效的以零结尾的字符串指针
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const u8) -> usize {
     let mut len = 0;
@@ -160,6 +191,9 @@ pub unsafe extern "C" fn strlen(s: *const u8) -> usize {
     len
 }
 
+/// # Safety
+///
+/// 调用者必须确保 s1 和 s2 是有效的以零结尾的字符串指针
 #[no_mangle]
 pub unsafe extern "C" fn strcmp(s1: *const u8, s2: *const u8) -> i32 {
     let mut i = 0;
@@ -176,6 +210,9 @@ pub unsafe extern "C" fn strcmp(s1: *const u8, s2: *const u8) -> i32 {
     }
 }
 
+/// # Safety
+///
+/// 调用者必须确保 dest 有足够的空间，且 src 是有效的以零结尾的字符串指针
 #[no_mangle]
 pub unsafe extern "C" fn strcpy(dest: *mut u8, src: *const u8) -> *mut u8 {
     let mut i = 0;
@@ -191,12 +228,18 @@ pub unsafe extern "C" fn strcpy(dest: *mut u8, src: *const u8) -> *mut u8 {
 }
 
 // 内存函数
+/// # Safety
+///
+/// 调用者必须确保 dest 和 src 是有效的指针，且不重叠
 #[no_mangle]
 pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8 {
     core::ptr::copy(src, dest, n);
     dest
 }
 
+/// # Safety
+///
+/// 调用者必须确保 s 是有效的指针，指向 n 字节的可写内存
 #[no_mangle]
 pub unsafe extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
     core::ptr::write_bytes(s, c as u8, n);
@@ -204,6 +247,9 @@ pub unsafe extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
 }
 
 // 标准输入输出函数
+/// # Safety
+///
+/// 调用者必须确保 s 是有效的以零结尾的字符串指针
 #[no_mangle]
 pub unsafe extern "C" fn puts(s: *const u8) -> i32 {
     let len = strlen(s);
@@ -213,6 +259,9 @@ pub unsafe extern "C" fn puts(s: *const u8) -> i32 {
     write(STDOUT_FILENO, buf.as_ptr(), len + 1) as i32
 }
 
+/// # Safety
+///
+/// 调用者必须确保 format 是有效的以零结尾的字符串指针
 #[no_mangle]
 pub unsafe extern "C" fn printf(format: *const u8, _: ...) -> i32 {
     // 简化实现，仅支持 %s 和 %d

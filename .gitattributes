@@ -1,0 +1,22 @@
+# Set default behavior, in case people don't have core.autocrlf set.
+* text=auto eol=lf
+
+# Explicitly specify line endings for certain files
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+
+# Binary files (don't touch line endings)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.bmp binary
+*.svg binary
+*.elf binary
+*.efi binary
+*.bin binary
+*.raw binary

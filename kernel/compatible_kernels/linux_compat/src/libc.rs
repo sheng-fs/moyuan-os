@@ -113,9 +113,9 @@ pub extern "C" fn exit(status: i32) -> ! {
             "syscall",
             in("rax") 60, // Linux exit系统调用号
             in("rdi") status,
+            options(noreturn),
         );
     }
-    loop {}
 }
 
 // 读取函数
