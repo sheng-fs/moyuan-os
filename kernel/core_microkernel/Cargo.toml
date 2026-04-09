@@ -2,7 +2,7 @@
 name = "moyuan-core-microkernel"
 version = "0.1.0-alpha.1"
 edition = "2021"
-autotests = false
+autotests = true
 autobenches = false
 
 [features]
@@ -42,5 +42,5 @@ path = "src/main.rs"
 
 [[bin]]
 name = "test_kernel"
-path = "src/main.rs"
+path = "src/test_main.rs"
 required-features = ["test"]

@@ -71,19 +71,12 @@ fn serial_puts(port: u16, s: &[u8]) {
     }
 }
 
-fn print_hex(port: u16, value: u64) {
-    let hex_chars = b"0123456789ABCDEF";
-    serial_puts(port, b"0x");
-    for i in 0..16 {
-        let nibble = ((value >> (60 - 4 * i)) & 0xF) as usize;
-        serial_putc(port, hex_chars[nibble]);
-    }
-}
+
 
 #[no_mangle]
 extern "C" fn _start(_boot_info: *mut BootInfo) -> ! {
     const SERIAL_PORT: u16 = 0x3F8;
-    
+
     // 最简单的串口输出测试
     unsafe {
         // 简单初始化串口
@@ -100,7 +93,7 @@ extern "C" fn _start(_boot_info: *mut BootInfo) -> ! {
         serial_puts(SERIAL_PORT, b"[KERNEL] Initialization Complete!\n");
         serial_puts(SERIAL_PORT, b"[KERNEL] Welcome to MOYUAN OS!\n");
     }
-    
+
     loop {
         unsafe { core::arch::asm!("hlt"); }
     }

@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "bootloader/uefi",
     "kernel/core_microkernel",
@@ -17,11 +18,14 @@ members = [
     "services/gui_service",
     "services/shell_service",
     "services/container_service",
+    "services/audio",
+    "services/input_method",
     "userland/libs/libc",
     "userland/bin/ls",
     "userland/bin/cat",
     "userland/bin/mkdir",
-    "userland/bin/rm"
+    "userland/bin/rm",
+    "userland/browser"
 ]
 
 [profile.dev]

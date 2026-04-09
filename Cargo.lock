@@ -116,6 +116,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "moyuan-audio"
+version = "0.1.0"
+dependencies = [
+ "moyuan-core-microkernel",
+ "moyuan-fs-service",
+ "moyuan-gui-service",
+]
+
+[[package]]
+name = "moyuan-browser"
+version = "0.1.0"
+dependencies = [
+ "moyuan-core-microkernel",
+ "moyuan-fs-service",
+ "moyuan-gui-service",
+ "moyuan-network-service",
+]
+
+[[package]]
 name = "moyuan-config-service"
 version = "0.1.0-alpha.1"
 
@@ -163,6 +182,15 @@ dependencies = [
  "moyuan-device-service",
  "moyuan-fs-service",
  "moyuan-libc",
+]
+
+[[package]]
+name = "moyuan-input-method"
+version = "0.1.0"
+dependencies = [
+ "moyuan-core-microkernel",
+ "moyuan-fs-service",
+ "moyuan-gui-service",
 ]
 
 [[package]]

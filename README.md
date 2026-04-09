@@ -6,7 +6,7 @@
 
 **当前状态：** 初期开发阶段
 
-**最近更新：** 2026-03-21
+**最近更新：** 2026-04-09
 
 **已实现功能：**
 - 内核基本架构
@@ -16,6 +16,7 @@
 - 设备服务
 - 控制台输出（VGA 和串口）
 - UEFI 引导加载器
+- GRUB 引导支持
 - 基本的用户空间工具
 - 飞地核心模块及硬件资源管理
 - PVH 启动支持
@@ -23,6 +24,7 @@
 - 安全模块（用户/组管理和文件权限控制）
 - 电源管理功能
 - 调试构建和运行配置
+- 完整的构建和部署流程
 
 **开发计划：**
 - 完善文件系统
@@ -34,42 +36,38 @@
 ## 项目结构
 
 ```
-├── assets/           # 资源文件
 ├── bootloader/       # 引导加载器
+│   ├── bios/         # BIOS 引导相关
+│   ├── grub/         # GRUB 配置
+│   └── uefi/         # UEFI 引导加载器
 ├── build/            # 构建输出目录
-├── docs/             # 文档
 ├── iso/              # ISO 镜像
 ├── kernel/           # 内核源码
 │   ├── arch/         # 架构相关代码
 │   ├── compatible_kernels/ # 兼容层
 │   ├── core_microkernel/ # 核心微内核
-│   ├── modules/      # 内核模块
 │   └── security/     # 安全相关代码
-├── resources/        # 资源
-├── security_policy/  # 安全策略
+├── resources/        # 资源文件
 ├── services/         # 系统服务
+│   ├── audio/        # 音频服务
 │   ├── config_service/ # 配置服务
 │   ├── container_service/ # 容器服务
 │   ├── device_service/ # 设备服务
 │   ├── fs_service/   # 文件系统服务
 │   ├── gui_service/  # GUI 服务
 │   ├── init/         # 初始化服务
+│   ├── input_method/ # 输入法服务
 │   ├── log_service/  # 日志服务
 │   ├── network_service/ # 网络服务
 │   ├── power_service/ # 电源服务
 │   ├── security_service/ # 安全服务
 │   ├── shell_service/ # Shell 服务
 │   └── time_service/ # 时间服务
-├── target/           # Rust 构建目标
-├── third_party/      # 第三方库
-├── toolchain/        # 工具链
 ├── userland/         # 用户空间
-│   ├── apps/         # 应用程序
 │   ├── bin/          # 二进制文件
+│   ├── browser/      # 浏览器
 │   ├── libs/         # 库文件
-│   ├── loader/       # 加载器
-│   └── tests/        # 测试
-├── virtualization/   # 虚拟化
+│   └── shell/        # Shell
 ├── Cargo.toml        # Rust 项目配置
 ├── Makefile          # 构建脚本
 └── README.md         # 项目说明
@@ -83,6 +81,7 @@
 - **模块化设计**：系统组件高度模块化，便于扩展和维护
 - **安全优先**：内置安全机制，保护系统和用户数据
 - **现代化服务**：提供容器、网络、GUI 等现代操作系统服务
+- **多引导方式**：支持 UEFI、GRUB 和直接内核启动
 
 ## 系统要求
 
@@ -90,13 +89,14 @@
 - NASM 汇编器
 - QEMU 模拟器（用于测试）
 - GCC 编译器（用于某些组件）
+- GRUB 工具（用于创建 ISO 镜像）
 
 ## 构建和运行
 
 ### 构建项目
 
 ```bash
-# 构建整个项目
+# 构建整个项目（内核 + UEFI 引导加载器 + ISO）
 make all
 
 # 仅构建内核
@@ -104,12 +104,15 @@ make kernel
 
 # 仅构建 UEFI 引导加载器
 make uefi_bootloader
+
+# 构建 ISO 镜像
+make iso
 ```
 
 ### 运行项目
 
 ```bash
-# 运行内核（在 QEMU 中）
+# 运行内核（直接内核启动）
 make run
 
 # 运行测试内核
@@ -117,6 +120,25 @@ make run_test
 
 # 运行 UEFI 模拟器
 make run_uefi
+
+# 运行 GRUB 模拟器
+make run_grub
+```
+
+### 调试项目
+
+```bash
+# 运行调试环境（直接内核启动）
+make debug
+
+# 运行 UEFI 调试环境
+make debug_uefi
+
+# 运行 GRUB 调试环境
+make debug_grub
+
+# 运行调试测试
+make debug_test
 ```
 
 ### 清理构建产物
@@ -132,6 +154,8 @@ make clean
 - **核心微内核**：提供进程管理、内存管理、中断处理等基础功能
 - **架构支持**：支持 x86_64、AArch64 和 RISC-V 架构
 - **兼容层**：提供 POSIX、Linux 和 RTOS 兼容层
+- **飞地核心**：硬件隔离和安全执行环境
+- **网络栈**：基础网络协议支持
 
 ### 系统服务
 
@@ -147,11 +171,15 @@ make clean
 - **电源服务**：电源管理
 - **日志服务**：系统日志
 - **配置服务**：系统配置
+- **音频服务**：音频处理和播放
+- **输入法服务**：输入法支持
 
 ### 用户空间
 
 - **标准库**：提供用户程序所需的库函数
 - **基本工具**：包括 ls、cat、mkdir、rm 等基本命令
+- **浏览器**：Web 浏览功能
+- **Shell**：命令行解释器
 - **应用程序**：用户应用程序
 
 ## 开发指南
